@@ -24,9 +24,13 @@ function scratch(...segments) {
 // produces rather than guessing from appearance.
 import fs from 'node:fs'
 
-// Directory names, not package names: the packages publish under an npm scope,
-// but on disk they stay `packages/<name>`.
-const roots = [PACKAGE_ROOT, path.resolve(PACKAGE_ROOT, '..', 'dsh-presentation-preset')]
+// The package directory itself. This used to also scan a sibling
+// `dsh-presentation-preset` package; the Agent preset now lives inside this
+// package's bundle patch, so there is no sibling to scan.
+//
+// A root that does not exist is skipped rather than fatal: the scan is a
+// safety net, and it should not become the reason a build fails.
+const roots = [PACKAGE_ROOT].filter((root) => fs.existsSync(root))
 
 // Character pairs that only appear through UTF-8-read-as-GBK corruption.
 const TELLS = ['婕', '鏂', '妯', '紡', '鐢', '鎴', '闇', '鍥', '鏄', '绠', '鍒', '鏋', '鎵', '骞', '鐨', '銆', '锛', '鈥', '鈫', '鍜', '鍚', '鏇', '缂', '晱']

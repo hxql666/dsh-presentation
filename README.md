@@ -31,8 +31,7 @@ This plugin takes the layout away from the model:
 
 | Path | What it is |
 |---|---|
-| [`packages/dsh-presentation`](packages/dsh-presentation) | The plugin: a collaboration mode (`/deck`) plus five deck tools. |
-| [`packages/dsh-presentation-preset`](packages/dsh-presentation-preset) | An Agent preset that puts a fifth card in **Settings → Agent preset** and in the new-session mode picker. |
+| [`packages/dsh-presentation`](packages/dsh-presentation) | One package. It ships the collaboration mode (`/deck`) and five deck tools, and its bundle patch declares the Agent preset that puts a card in **Settings → Agent preset** and in the new-session mode picker. |
 
 These are two different DSH mechanisms, and the distinction matters:
 
@@ -41,78 +40,48 @@ These are two different DSH mechanisms, and the distinction matters:
 - **Collaboration mode** — a toggle inside a session, like `plan`. The plugin's
   `/deck` command is one.
 
-Installing only the plugin gives you `/deck` in every preset. Installing the
-preset as well adds the picker entry.
+Both arrive from the one package: the preset is declared by the plugin's own
+bundle patch, so selecting the card is what mounts the deck tools. There is no
+second package to install and no second entry in the plugin list.
 
 ## Install
 
-Two packages. Installing the preset also installs the plugin, because the preset declares it as a dependency:
-
-| Package | What it gives you |
-|---|---|
-| `@hxql/dsh-presentation` | the plugin: the `/deck` mode and the five deck tools |
-| `@hxql/dsh-presentation-preset` | the Agent preset: the card in **Settings → Agent preset** and the mode picker |
-
-Install only the plugin and `/deck` works inside whatever preset you already
-use. Add the preset to get the picker entry as well.
-
-### From npm (recommended)
-
 ```bash
-# the plugin, which is the part that does the work
 dsh plugin --profile desktop add @hxql/dsh-presentation
-
-# optional: the Agent preset, for the mode picker
-dsh plugin --profile desktop add @hxql/dsh-presentation-preset
 ```
 
-### From a clone
+Then **restart the app**. Installed plugins load at startup, and a replaced
+package needs a fresh module generation before its new code is used.
+
+After the restart you get two things from that one package:
+
+- a **演示模式** card in **Settings → Agent preset** and in the new-session mode
+  picker, and
+- the `/deck` command and five deck tools, which mount with that preset.
+
+From a clone, point at the directory instead:
 
 ```bash
 git clone https://github.com/hxql666/dsh-presentation
 cd dsh-presentation
-pnpm install          # links the workspace and fetches the Typst binary
+npm install          # fetches the Typst binary for this platform
 dsh plugin --profile desktop add "$PWD/packages/dsh-presentation"
-dsh plugin --profile desktop add "$PWD/packages/dsh-presentation-preset"
 ```
-
-### Then restart the app
-
-Installed plugins load at startup, and a replaced package needs a fresh module
-generation before its new code is used.
-
-### If the plugin seems missing after installing the preset
-
-Regional mirrors sync the npm registry asynchronously, and a mirror can briefly
-serve a stale `latest` for the preset — one whose dependency on the plugin is
-absent. The install then succeeds and the plugin is simply not there.
-
-Check what you actually got, and install from the official registry if it is
-short:
-
-```bash
-npm ls @hxql/dsh-presentation          # is the plugin present?
-
-# force the official registry for this install
-npm install @hxql/dsh-presentation-preset --registry=https://registry.npmjs.org/
-```
-
-The mirror catches up on its own; retrying later works.
 
 ### Why not a git URL
 
 A plugin that ships a platform binary does not install reliably from a git URL,
-and this was measured rather than assumed:
+measured rather than assumed:
 
 | Attempt | Result |
 |---|---|
 | `dsh plugin add <local clone>/packages/dsh-presentation` | works; the binary resolves |
-| a packaged tarball of the plugin | works; `verified=true`, a deck builds |
+| a packaged tarball | works; `verified=true`, a deck builds |
 | `npm install github:hxql666/dsh-presentation` | **fails** — npm clones the repository and runs its root `prepare` |
 | `npm install <repo archive>.tar.gz` | installs, but **`optionalDependencies` are not fetched**, so there is no Typst binary and every build reports `binary-unavailable` |
 
-If a build ever reports `binary-unavailable`, the platform package did not
-install. Fix it either way:
+If a build reports `binary-unavailable`, the platform package did not install.
+Fix it either way:
 
 ```bash
 # inside the installed package directory
@@ -261,76 +230,40 @@ Typst + Touying 编译成 PDF，并把页面**渲染回图片让 agent 亲眼看
 - 十五种版式原语掌握全部排版决策，所以改一页重建后，没动过的页保持像素一致
 - 编译后渲染成 PNG 让模型回读：重叠、裁切、空得发慌的页面、装不下的句子 —— 都在别人看到之前发现并修掉
 
-## 两个包，两套机制
+## 一个包，两样东西
 
-| 路径 | 是什么 |
+**一个包就够了。** 它同时提供：
+
+| 你会看到 | 是什么 |
 |---|---|
-| `packages/dsh-presentation` | 插件本体：协作模式（`/deck`）+ 五个 deck 工具 |
-| `packages/dsh-presentation-preset` | Agent 预设：让 **设置 → Agent 预设** 与新对话模式选择器里多一张卡片 |
+| 插件列表里的 **1 项** | 插件本体（`/deck` 模式 + 五个 deck 工具） |
+| 模式选择器里的 **1 张卡片**「演示模式」 | Agent 预设 —— 由插件自己的 bundle patch 声明 |
 
 - **Agent 预设** = Agent 手上的插件集合，就是模式选择器里和 标准/PTC/极简/创造 并列的那个
 - **协作模式** = 会话内的开关，和 `/plan` 同类，本插件的 `/deck` 属于这一种
 
-只装插件 → 任何预设下都能用 `/deck`；再装预设 → 模式列表里多一个入口。
+预设声明就在插件的 `cordis.patch.yml` 里，所以**选那张卡片就是挂载这个插件**。
+没有第二个包要装，也没有第二条插件条目。
 
 ## 安装
 
-两个包。**装预设会连带装上插件** —— 预设把它声明为依赖：
-
-| 包 | 作用 |
-|---|---|
-| `@hxql/dsh-presentation` | 插件本体：`/deck` 模式与五个 deck 工具 |
-| `@hxql/dsh-presentation-preset` | Agent 预设：**设置 → Agent 预设** 与新对话模式选择器里的卡片 |
-
-只装插件，`/deck` 在你现有预设下就能用；再装预设才多出模式选择器里的入口。
-
 ```bash
-# 从 npm（推荐）
 dsh plugin --profile desktop add @hxql/dsh-presentation
-dsh plugin --profile desktop add @hxql/dsh-presentation-preset
-
-# 或从一个克隆
-git clone https://github.com/hxql666/dsh-presentation
-cd dsh-presentation
-pnpm install
-dsh plugin --profile desktop add "$PWD/packages/dsh-presentation"
-dsh plugin --profile desktop add "$PWD/packages/dsh-presentation-preset"
 ```
 
 装完**必须重启应用**才会加载新的模块代。
 
-### 装了预设却好像没有插件？
+重启后你会从这一个包得到两样东西：**设置 → Agent 预设** 与新对话模式选择器里的
+「演示模式」卡片，以及随之挂载的 `/deck` 命令与五个 deck 工具。
 
-各地区镜像对 npm registry 是**异步同步**的，可能短暂地把预设的 `latest` 指向旧版本
-—— 而那个旧版本没有声明对插件的依赖。于是安装成功，插件却不在。
-
-先看实际装到了什么，缺了就从官方 registry 装：
+从克隆安装：
 
 ```bash
-npm ls @hxql/dsh-presentation          # 插件在不在？
-
-# 这次安装强制走官方
-npm install @hxql/dsh-presentation-preset --registry=https://registry.npmjs.org/
-```
-
-镜像会自己追上；过一会重试即可。
-
-**为什么不能直接用 git URL**：实测过 —— 带平台二进制的插件从 git URL 装不可靠。
-`npm install github:...` 会因为 npm 克隆整仓并执行根的 `prepare` 而失败；
-装仓库的 archive tarball 则**不会拉取 `optionalDependencies`**，于是没有 Typst 二进制，
-每次构建都报 `binary-unavailable`。
-
-若真的遇到 `binary-unavailable`，二选一：
-
-```bash
-# 在已安装的包目录里
+git clone https://github.com/hxql666/dsh-presentation
+cd dsh-presentation
 npm install
-
-# 或在插件配置里指向自备的 Typst 0.15.1+ 二进制
-#   typstBinaryPath: /absolute/path/to/typst
+dsh plugin --profile desktop add "$PWD/packages/dsh-presentation"
 ```
-
-后者也覆盖没有内置二进制的平台：32 位系统、`linux-armv7`、BSD。
 
 ## 使用
 
@@ -338,6 +271,8 @@ npm install
 /deck                    进入演示文档模式
 /deck handout            讲义形式
 /deck theme:stargazer    指定主题
+/deck scene:academic     设置常驻场景
+/deck scene off          清除
 /deck off                退出
 ```
 

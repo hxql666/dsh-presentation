@@ -1,29 +1,140 @@
-# dsh bundle patch: inserts this plugin into a profile's layer stack.
+# One package, one row set.
 #
-# `section` is the guidance this mode injects into every model request while it
-# is active; it is the whole point of the mode, so it lives with the row.
+# This file declares the Agent preset "presentation" — the card in
+# Settings → Agent preset and in the new-session mode picker — and that preset's
+# plugin list carries this package's own row. Selecting the card is what mounts
+# the deck tools.
+#
+# It was two packages before, and merging them means one entry in the plugin list
+# rather than two, one install command rather than two, and a single copy of the
+# guidance below that cannot drift out of step with itself.
+#
+# `dsh-agent-preset` is an entry group, so a bundle patch may insert it. Its
+# `plugins` array is an ordinary Cordis entry list, mounted inside the preset's
+# own scope each time the preset is used.
+#
+# The composition is deliberately the standard capability set with three changes:
+#
+#   * This package is added, which is what makes the deck tools exist.
+#   * The shell rows are dropped. Building a deck needs the workspace, not a
+#     terminal: the plugin resolves and runs the Typst compiler itself, so a
+#     shell would only widen the surface a presentation session has to reason
+#     about (and widen the prompt prefix with it).
+#   * Delegation is dropped for the same reason — a deck is authored here.
+#
+# Everything else matches `standard`, so files, search, skills, goals, todos,
+# web research, `present` and compaction all keep working.
 - insert:
-    - id: presentation-mode
-      name: '@hxql/dsh-presentation'
+    - id: preset-presentation
+      name: '@deepseek-ai/dsh-agent-preset'
       config:
-        section: |
-          You are in presentation-document mode. The deliverable is a PDF presentation, not code.
+        id: presentation
+        order: 5
+        name: 演示模式
+        description: 以结构化数据驱动 Typst/Touying 生成 PDF 演示文稿，并渲染页面自审版式。
+        plugins:
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              suffix: Your working directory is {{cwd}}.
+              prefix: You are a presentation-document agent powered by the {{model}} model. The deliverable is a PDF deck, not code.
+          - id: agent-instructions
+            name: '@deepseek-ai/dsh-agent-instructions'
+            config:
+              maxBytes: 65536
+          - id: tool-fs
+            name: '@deepseek-ai/dsh-tool-fs'
+          - id: tool-fs-search
+            name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              sampleOverCapGlobResults: false
+          - id: tool-jobs
+            name: '@deepseek-ai/dsh-tool-jobs'
+          - id: skill-filesystem
+            name: '@deepseek-ai/dsh-skill-filesystem'
+          - id: tool-skill
+            name: '@deepseek-ai/dsh-tool-skill'
+          - id: command-goal
+            name: '@deepseek-ai/dsh-command-goal'
+          - id: tool-goal
+            name: '@deepseek-ai/dsh-tool-goal'
+          - id: planning
+            name: cordis:group
+            group: true
+            isolate:
+              planMode: true
+            config:
+              - id: plan-mode
+                name: '@deepseek-ai/dsh-plan-mode'
+                config:
+                  section: |
+                    You are in plan mode. Stay in plan mode until exit_plan_mode succeeds or the user switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement — including an answer confirming something you asked — approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
 
-          Author decks as structured page data and compile them with deck_build. Never write Typst markup yourself: the layout engine owns all typesetting, so any hand-written markup is ignored at best and a compile error at worst. Inline emphasis inside text slots is **bold** and *italic*; everything else renders literally.
+                    For a deck, the plan is the argument: state the audience and what they must leave believing, then the page sequence and the one claim each page makes. Choose a layout per page from deck_status rather than forcing every page into bullets. Do not build the deck yet.
 
-          Work in this order. Call deck_status first to see the layouts, their slots, and the active theme. Then plan the page sequence before filling any page — a deck is an argument, so decide what each page must establish and in what order. Then build. Then call deck_check and actually read the rendered page images back with the image-reading tool; inspect them for overlapping text, content that overflows or is clipped, frames that are nearly empty or uncomfortably full, and wording that does not fit its slot. Fix the spec and rebuild until the pages look right, then deliver.
+                    When ready, call exit_plan_mode with the complete plan markdown, starting with a # title. Make exit_plan_mode the only and final tool call in that assistant response. If review rejects it, incorporate the feedback and present again.
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+              toolResultPruner: true
+            config:
+              - id: compaction-basic
+                name: '@deepseek-ai/dsh-compaction-basic'
+              - id: command-compact
+                name: '@deepseek-ai/dsh-command-compact'
+              - id: tool-result-pruner
+                name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+                config:
+                  thresholdChars: 8192
+                  headChars: 4096
+                  tailChars: 1024
+          - id: tool-ask-user
+            name: '@deepseek-ai/dsh-tool-ask-user'
+          - id: tool-todo
+            name: '@deepseek-ai/dsh-tool-todo'
+            config:
+              allowParallelInProgress: true
+          - id: tool-web
+            name: '@deepseek-ai/dsh-tool-web'
+            config:
+              fetch: true
+              searchTimeoutMs: 60000
+          - id: present
+            name: '@deepseek-ai/dsh-tool-present'
+          # This package. The name is the published package name, which is what a
+          # consumer resolves and what a local install reaches through
+          # `node_modules/@hxql/dsh-presentation`. It is deliberately not the
+          # on-disk folder name: the host caches an ESM module by resolved URL, so
+          # a name that changed per build would keep loading the previous code.
+          - id: presentation
+            name: '@hxql/dsh-presentation'
+            config:
+              # `section` is required by the plugin and is the only place this
+              # guidance belongs: the plugin adds it to the request only while
+              # presentation-document mode is on, so it costs nothing otherwise.
+              section: |
+                You are in presentation-document mode. The deliverable is a PDF deck, not code.
 
-          Choose a layout per page from deck_status rather than forcing every page into bullets. Use section pages to mark turns in the argument, kpis or timeline for numbers and sequence, compare for a contrast, quote for a single claim, table for tabular data, code only when the audience must read code, and cards for parallel options. Keep one idea per page and prefer fewer, better-filled pages over many thin ones.
+                Author decks as structured page data and compile them with deck_build. Never write Typst markup yourself: the layout engine owns all typesetting, so hand-written markup is ignored at best. Inline emphasis inside text slots is **bold** and *italic*; everything else renders literally.
 
-          Write for a room, not a reader: short lines, concrete nouns, no filler. Slide text is not prose, and the audience reads it faster than you can speak it.
+                Call deck_status first for the page layouts, their slots, the themes, and the scenes. Pass `scene` when the request is a known kind of talk (tech-talk, academic, teaching, product, review, pitch): a scene sets the theme, frame ratio, font stack, a usual page order, and the register the slides should read in. Choose a layout per page rather than forcing every page into bullets, and keep one idea per page.
 
-          The deck lives in the deck directory reported by deck_status unless the user asks for another path. Tell them the PDF path when you finish, and mention any speaker notes you added. Use /deck off to leave this mode; while it is inactive the deck tools refuse to run.
-        theme: metropolis
-        aspectRatio: 16-9
-        fontStack: sans
-        workdir: ''
-        typstBinaryPath: ''
-        timeoutMs: 180000
-        maxOutputBytes: 67108864
-        maxPages: 200
-        checkPpi: 110
+                Work in this order: plan the page sequence, build, then call deck_check and actually read the rendered page images back with the image-reading tool. Inspect them for overlapping text, content that overflows or is clipped, frames that are nearly empty or uncomfortably full, and wording that does not fit. Fix the spec and rebuild until the pages look right, then deliver.
+
+                Write for a room, not a reader: short lines, concrete nouns, no filler.
+              # Language facts for line breaking and punctuation; see the plugin README.
+              locale: zh
+              workdir: ''
+              # `auto` prefers the bundled, hash-verified binary and falls back to
+              # a Typst already on PATH; `system` prefers PATH, so nothing is
+              # downloaded. See the plugin README.
+              typstPath: auto
+              timeoutMs: 180000
+              maxOutputBytes: 67108864
+              maxPages: 200
+              checkPpi: 110
+          - id: tool-plugin-manager
+            name: '@deepseek-ai/dsh-plugin-manager/tools'
+            disabled: true
