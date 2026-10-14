@@ -148,7 +148,7 @@ export function registerTools(ctx, config) {
       // `defineTool` compiles the author DSL to raw JSON Schema and asserts the
       // host's supported subset, so this is the same gate activation runs.
       tool = defineTool(definition)
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
       const reason = Array.isArray(error?.violations) ? error.violations.join('; ') : String(error?.message ?? error)
       skipped.push({ name: definition.name, reason })
       ctx.logger?.warn?.(`@hxql/dsh-presentation: skipped tool ${definition.name} — its schema did not compile: ${reason}`)
@@ -475,6 +475,7 @@ function buildToolDefinitions(config) {
         additionalProperties: true,
         properties: {
           active: { type: 'boolean', required: true },
+          scene: { type: 'string' },
           layouts: { type: 'array', items: { type: 'object', additionalProperties: true } },
         },
       },
@@ -482,7 +483,11 @@ function buildToolDefinitions(config) {
     },
     async execute(_args, exec) {
       const session = exec?.agent?.session
-      const state = session === undefined ? { active: false, handout: false } : readModeState(session)
+      // The fallback carries every ModeState field so the value below has one
+      // shape whether or not a session exists.
+      /** @type {import('./mode.js').ModeState} */
+      const noSession = { active: false, handout: false, theme: undefined, scene: undefined }
+      const state = session === undefined ? noSession : readModeState(session)
 
       let binary
       try {
@@ -516,6 +521,7 @@ function buildToolDefinitions(config) {
         active: state.active === true,
         handout: state.handout === true,
         theme: state.theme ?? config.theme,
+        scene: state.scene,
         aspectRatio: config.aspectRatio,
         fontStack: config.fontStack,
         deckDir: deckDir(exec, config.workdir),

@@ -87,7 +87,16 @@ function authorError(message) {
   throw new JsonSchemaError([message])
 }
 
-/** Whether a value is a plain record, as opposed to an array or a class instance. */
+/**
+ * Whether a value is a plain record, as opposed to an array or a class instance.
+ *
+ * A type predicate rather than a plain boolean so the callers that validate
+ * an object schema can index the value without casting it. The guard is the
+ * same either way; the annotation only tells the checker what was proved.
+ *
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
 function isSchemaRecord(value) {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
   const prototype = Object.getPrototypeOf(value)

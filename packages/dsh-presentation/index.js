@@ -24,6 +24,7 @@ import {
   narrationText,
   readModeState,
 } from './lib/mode.js'
+import { SCENES } from './lib/scenes.js'
 import { registerTools } from './lib/tools.js'
 
 /** Loader row name. */
@@ -45,7 +46,7 @@ export const configFields = CONFIG_FIELDS
 /**
  * Register the mode, its guidance section, the human command, and the tools.
  *
- * @param {object} ctx Cordis context.
+ * @param {import('../types/dsh.js').DshContext} ctx Cordis context.
  * @param {object} rawConfig The row's config, validated here.
  */
 export function apply(ctx, rawConfig) {
@@ -142,7 +143,7 @@ export function apply(ctx, rawConfig) {
    * to a request that was already assembled.
    *
    * @param {object} agent
-   * @param {{ active: boolean, handout?: boolean, theme?: string }} next
+   * @param {{ active: boolean, handout?: boolean, theme?: string, scene?: string }} next
    * @returns {'committed'|'queued'|'noop'}
    */
   const setMode = (agent, next) => {
@@ -182,11 +183,14 @@ export function apply(ctx, rawConfig) {
 
   // --- the human command -------------------------------------------------
   ctx.inject(['commands'], (commandCtx) => {
-    commandCtx.commands.register({
+    // `commands` is optional on the context because it is obtained through
+    // `inject`; reaching it here means the service resolved, so the check is
+    // for the type only.
+    commandCtx.commands?.register({
       definitionId: '@hxql/dsh-presentation',
       name: MODE_COMMAND,
       description: 'Enter or leave presentation-document mode',
-      input: { hint: '[off|handout|theme:<name>]', attachments: false },
+      input: { hint: '[off|handout|theme:<name>|scene:<name>]', attachments: false },
       handler: ({ agent, rawInput }) => {
         const message = String(rawInput ?? '').trim()
         if (sessionOf(agent) === undefined) return { kind: 'error', text: 'No session to switch.' }
@@ -209,10 +213,26 @@ export function apply(ctx, rawConfig) {
           return { kind: 'success', text: `Presentation-document mode on, theme ${theme}.${suffix(setMode(agent, { active: true, theme }))}` }
         }
 
+        // A scene is a standing default for the deck register, read back by
+        // deck_build when the spec names no scene of its own. Validated here so
+        // a typo is refused with the list rather than stored and ignored.
+        if (message === 'scene off') {
+          return { kind: 'success', text: `Presentation-document mode on, scene cleared.${suffix(setMode(agent, { active: true, scene: undefined }))}` }
+        }
+        const sceneMatch = /^scene:(.+)$/.exec(message)
+        if (sceneMatch !== null) {
+          const scene = sceneMatch[1].trim()
+          const known = SCENES.map((entry) => entry.id)
+          if (!known.includes(scene)) {
+            return { kind: 'error', text: `Unknown scene ${JSON.stringify(scene)}. Use /${MODE_COMMAND} scene:<${known.join('|')}>.` }
+          }
+          return { kind: 'success', text: `Presentation-document mode on, scene ${scene}.${suffix(setMode(agent, { active: true, scene }))}` }
+        }
+
         if (message !== '') {
           return {
             kind: 'error',
-            text: `Unknown /${MODE_COMMAND} argument ${JSON.stringify(message)}. Use /${MODE_COMMAND}, /${MODE_COMMAND} off, /${MODE_COMMAND} handout, or /${MODE_COMMAND} theme:<name>.`,
+            text: `Unknown /${MODE_COMMAND} argument ${JSON.stringify(message)}. Use /${MODE_COMMAND}, /${MODE_COMMAND} off, /${MODE_COMMAND} handout, /${MODE_COMMAND} theme:<name>, or /${MODE_COMMAND} scene:<name>.`,
           }
         }
 

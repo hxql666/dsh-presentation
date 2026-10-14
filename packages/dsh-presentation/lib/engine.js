@@ -142,6 +142,12 @@ function findSystemTypst(command) {
 
 /** Engine failures carry a stable `code` for the model-facing tool layer. */
 export class EngineError extends Error {
+  /**
+   * @param {string} code Stable machine-readable reason.
+   * @param {string} message Human-facing explanation.
+   * @param {object} [details] Extra facts for the log or the model; omitted when
+   *   there is nothing to add, which is why the parameter is optional.
+   */
   constructor(code, message, details = undefined) {
     super(message)
     this.name = 'EngineError'
@@ -168,7 +174,10 @@ export function templatePath() {
  * dependency-provided binary is hash-verified against the digest the package
  * publishes, and a mismatch refuses to run.
  *
- * @param {{ configured?: string, verify?: boolean }} options
+ * @param {{ configured?: string, verify?: boolean, preferSystem?: boolean, systemCommand?: string }} options
+ *   `configured` is an explicit executable and is trusted as given.
+ *   `preferSystem` asks for a Typst already on PATH before the bundled binary.
+ *   `systemCommand` overrides the command name looked up on PATH.
  * @returns {{ path: string, version: string, source: string, verified: boolean, expectedSha256?: string }}
  */
 export function resolveBinary(options = {}) {
@@ -210,7 +219,7 @@ export function resolveBinary(options = {}) {
     let root
     try {
       root = packageRoot(name)
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
       attempted.push(`${name}: ${String(error?.message ?? error)}`)
       continue
     }
@@ -313,7 +322,7 @@ export function runTypst({ binary, args, cwd, timeoutMs }) {
     let child
     try {
       child = spawn(binary, args, { cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
       reject(new EngineError('spawn-failed', `could not start the Typst compiler: ${String(error?.message ?? error)}`))
       return
     }
@@ -339,17 +348,36 @@ export function runTypst({ binary, args, cwd, timeoutMs }) {
 }
 
 /**
+ * One diagnostic from the compiler.
+ *
+ * Every field beyond `severity`, `message` and `raw` is filled in by later lines
+ * of the same diagnostic block, so they are all optional and mutable: the object
+ * is built up as the block is read.
+ *
+ * @typedef {object} Diagnostic
+ * @property {string} severity   `error` or `warning`.
+ * @property {string} message
+ * @property {string} raw        The full block, so nothing is lost in parsing.
+ * @property {string} [file]
+ * @property {number} [line]
+ * @property {number} [column]
+ * @property {string} [hint]
+ */
+
+/**
  * Parse Typst diagnostics into structured entries the model can act on.
  *
  * Typst prints `error: <message>` followed by a source frame containing
  * `┌─ <file>:<line>:<col>`; hints and extra notes follow on their own lines.
  *
  * @param {string} stderr
- * @returns {{ message: string, file?: string, line?: number, column?: number, hint?: string, raw: string }[]}
+ * @returns {Diagnostic[]}
  */
 export function parseDiagnostics(stderr) {
   const lines = stderr.split(/\r?\n/)
+  /** @type {Diagnostic[]} */
   const out = []
+  /** @type {Diagnostic|null} */
   let current = null
   const frame = /^\s*[┌│├]?─*\s*(.+?):(\d+):(\d+)\s*$/
   for (const line of lines) {

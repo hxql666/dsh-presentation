@@ -22,7 +22,7 @@ Typst + Touying 生成 PDF 演示文稿，并带**视觉自审闭环**。
 |---|---|
 | 模式状态 | 从会话日志里 `/deck` 的 `command/run` + `command/done` 折叠推导，**不新增事件类型**；恢复与 fork 因此免费获得 |
 | 提示词段落 | `presentation:policy`，仅在模式激活时注入（顺序 500） |
-| 人类命令 | `/deck`、`/deck off`、`/deck handout`、`/deck theme:<name>` |
+| 人类命令 | `/deck`、`/deck off`、`/deck handout`、`/deck theme:<name>`、`/deck scene:<name>`（`scene off` 清除） |
 | 工具 | 常驻注册，靠模式门控（进入/离开不改变请求工具目录，前缀缓存不受影响）|
 
 ## 与宿主的三条硬契约（踩过的坑，勿回退）

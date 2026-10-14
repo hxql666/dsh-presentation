@@ -29,6 +29,7 @@
  *
  * @module @hxql/dsh-presentation/mode
  */
+import { findScene } from './scenes.js'
 
 /** The logged command records the mode state is derived from. */
 export const COMMAND_RUN_EVENT = 'command/run'
@@ -40,6 +41,21 @@ export const MODE_COMMAND = 'deck'
 /** Where the compiled deck and its spec live, relative to the session cwd. */
 export const DECK_DIR = 'deck'
 
+/**
+ * The mode state a caller reads back.
+ *
+ * Every field is always present — a field with no selection is `undefined`
+ * rather than absent — so a caller can compare or spread the value without
+ * checking which keys exist. `scene` joined this shape when `/deck scene:`
+ * was added; `deck_build` reads it as a standing default.
+ *
+ * @typedef {object} ModeState
+ * @property {boolean} active
+ * @property {boolean} handout
+ * @property {string|undefined} theme
+ * @property {string|undefined} scene
+ */
+
 /** The state before the session has selected anything. */
 const INITIAL_STATE = Object.freeze({ active: false, handout: false, theme: undefined, running: null })
 
@@ -50,7 +66,8 @@ const folded = new WeakMap()
  * Apply one accepted `/deck` invocation to the mode state.
  *
  * The argument vocabulary is the command handler's, and an argument the handler
- * refuses leaves the state untouched.
+ * refuses leaves the state untouched. `scene` is part of that vocabulary because
+ * `deck_build` reads it back as a standing default for the deck's register.
  *
  * @param {object} state State before the invocation.
  * @param {unknown} rawInput The invocation's raw input, as logged.
@@ -61,8 +78,17 @@ function applyInvocation(state, rawInput) {
   if (message === 'off') return Object.freeze({ ...state, active: false })
   if (message === 'handout') return Object.freeze({ ...state, active: true, handout: true })
   if (message === 'handout off') return Object.freeze({ ...state, active: true, handout: false })
+  if (message === 'scene off') return Object.freeze({ ...state, active: true, scene: undefined })
   const theme = /^theme:(.+)$/.exec(message)
   if (theme !== null) return Object.freeze({ ...state, active: true, theme: theme[1].trim() })
+  // Validated against the registry so a typo is refused by the handler rather
+  // than stored and quietly ignored by the build.
+  const scene = /^scene:(.+)$/.exec(message)
+  if (scene !== null) {
+    const id = scene[1].trim()
+    if (findScene(id) === undefined) return state
+    return Object.freeze({ ...state, active: true, scene: id })
+  }
   if (message === '') return Object.freeze({ ...state, active: true })
   return state
 }
@@ -128,11 +154,16 @@ function readFolded(session) {
  * Read the logged presentation-mode state of a session.
  *
  * @param {object} session A `Session` (`snapshotEvents`).
- * @returns {{ active: boolean, handout: boolean, theme: string|undefined }}
+ * @returns {ModeState}
  */
 export function readModeState(session) {
   const state = readFolded(session)
-  return { active: state.active === true, handout: state.handout === true, theme: state.theme }
+  return {
+    active: state.active === true,
+    handout: state.handout === true,
+    theme: state.theme,
+    scene: state.scene,
+  }
 }
 
 /** Whether presentation mode is currently active for a session. */

@@ -113,6 +113,8 @@ The second option also covers platforms with no bundled binary: 32-bit systems,
 /deck                    enter presentation-document mode
 /deck handout            handout form (one frame per logical slide)
 /deck theme:stargazer    pick a theme
+/deck scene:academic     set a standing scene default
+/deck scene off          clear it
 /deck off                leave
 ```
 
@@ -177,15 +179,51 @@ present in this repository — the test suite scans for exactly that (see
 `packages/dsh-presentation/test/encoding-audit.mjs` and the checks noted in each
 package README).
 
+## Releasing
+
+Publishing happens in CI, not from a laptop.
+
+npm requires an interactive two-factor challenge to publish. The alternatives
+are an authenticator app on every release or a granular access token with 2FA
+bypass — and npm has announced that those bypass tokens lose direct publish,
+targeted January 2027, in favour of trusted publishing.
+
+So `.github/workflows/publish.yml` publishes both packages over OIDC: the
+registry verifies that the workflow really ran in this repository. No token is
+stored, nothing expires, and no code has to be read out of an app. It runs the
+whole suite first, then packs both packages and refuses to publish if a tarball
+contains anything it should not.
+
+Run it from **Actions → Publish to npm → Run workflow**, with `dry-run` ticked
+to build and verify without publishing.
+
+One-time setup: each package must exist before a trusted publisher can be
+registered for it, so a first release has to be done interactively. After that,
+register the publisher on npmjs.com for both packages — user `hxql666`,
+repository `dsh-presentation`, workflow `publish.yml`.
+
 ## Tests
 
 ```bash
 npm test
 ```
 
-Runs the schema gate, the assembly test, the capability sweep, the scene tests,
-the handout check, and the encoding audit. Install dependencies first
-(`npm install`) so a platform Typst binary is present.
+Runs a type check, then the schema gate, the assembly test, the capability
+sweep, the locale and system-Typst checks, the scene tests, the handout check,
+and the encoding audit. Install dependencies first (`npm install`) so a platform
+Typst binary is present.
+
+The type check is `tsc --checkJs` over the source and its JSDoc. There is no
+build step: the plugin ships the JavaScript it runs, so `index.js` stays
+readable in the tarball and in a stack trace. What the check buys is that a
+contract cannot silently drift from the code — a parameter added to a function
+but not to its documentation, or a property read that no longer exists, fails
+here rather than at activation.
+
+`types/dsh.d.ts` describes the parts of the host this plugin uses. DSH ships no
+type declarations — the installed application contains zero `.d.ts` files — so
+that file is written by hand from the plugin's own call sites. It cannot catch
+a wrong assumption about the host; the tests are what do that.
 
 The suite covers the failure modes that actually bit this project:
 

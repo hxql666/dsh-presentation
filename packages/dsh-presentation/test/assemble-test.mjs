@@ -76,8 +76,10 @@ const config = {
   theme: 'metropolis',
   aspectRatio: '16-9',
   fontStack: 'sans',
+  locale: 'zh',
   workdir: '',
   typstBinaryPath: '',
+  typstPath: 'auto',
   timeoutMs: 180000,
   maxOutputBytes: 64 * 1024 * 1024,
   maxPages: 200,
@@ -142,6 +144,22 @@ console.log('active after off ->', sectionText())
 // A refused argument must not move the state.
 console.log('/deck bogus ->', JSON.stringify(runCommand(command, 'bogus')))
 console.log('active after bogus ->', sectionText())
+
+// A scene is a standing default for the deck register. It has to survive the
+// log fold and be visible to deck_status, because deck_build reads it.
+console.log('\n--- /deck scene: ---')
+console.log('/deck scene:academic ->', JSON.stringify(runCommand(command, 'scene:academic')))
+const afterScene = await registered.tools.get('deck_status').execute({}, { agent })
+console.log('  visible to deck_status:', afterScene.scene ?? '(absent)')
+
+// An unknown scene must be refused with the vocabulary, not stored.
+console.log('/deck scene:nope ->', JSON.stringify(runCommand(command, 'scene:nope')))
+const afterBadScene = await registered.tools.get('deck_status').execute({}, { agent })
+console.log('  scene unchanged after refusal:', afterBadScene.scene ?? '(absent)')
+
+console.log('/deck scene off ->', JSON.stringify(runCommand(command, 'scene off')))
+const afterSceneOff = await registered.tools.get('deck_status').execute({}, { agent })
+console.log('  scene cleared:', afterSceneOff.scene === undefined)
 
 runCommand(command, '')
 console.log('re-entered ->', sectionText())

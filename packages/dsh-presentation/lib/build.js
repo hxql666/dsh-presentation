@@ -47,6 +47,7 @@ function copyTree(from, to) {
  * @param {object} options
  * @param {object} options.spec        Raw deck spec.
  * @param {string} options.buildDir    Directory to (re)create.
+ * @param {boolean} [options.handout]  Emit the handout form.
  * @returns {{ typFile: string, specFile: string, spec: object }}
  */
 export function prepareDeck({ spec, buildDir, handout = false }) {
@@ -111,6 +112,8 @@ function copyReferencedAssets(spec, buildDir) {
  * @param {string} options.buildDir
  * @param {string} options.outFile
  * @param {string} [options.typstBinary]  Explicit compiler path.
+ * @param {string} [options.typstPath]    Which Typst to prefer: auto, system, or bundled.
+ * @param {boolean} [options.handout]     Emit the handout form.
  * @param {number} [options.timeoutMs]
  * @param {number} [options.maxOutputBytes]
  * @returns {Promise<object>} build facts, including structured diagnostics.
@@ -202,7 +205,10 @@ export async function buildDeckPdf({ spec, buildDir, outFile, typstBinary, typst
  * @param {string} options.outputPattern  e.g. `<dir>/page-{p}.png`
  * @param {number} [options.ppi]
  * @param {number[]} [options.pages]      Optional 1-based page subset.
- * @returns {Promise<{ files: string[], diagnostics: object[] }>}
+ * @param {string} [options.typstBinary]  Explicit compiler path.
+ * @param {string} [options.typstPath]    Which Typst to prefer: auto, system, or bundled.
+ * @param {number} [options.timeoutMs]
+ * @returns {Promise<{ files: string[], diagnostics: object[], stderr: string }>}   `stderr` is the tail the model needs when a page fails to render.
  */
 export async function renderDeckPages({ typFile, buildDir, outputPattern, ppi = 110, pages, typstBinary, typstPath, timeoutMs = 180000 }) {
   const binary = resolveBinary({ configured: typstBinary, preferSystem: typstPath === 'system' })
@@ -242,7 +248,20 @@ export async function renderDeckPages({ typFile, buildDir, outputPattern, ppi = 
   return { files, diagnostics, stderr: result.stderr.slice(-8000) }
 }
 
-/** Extract the pdfpc speaker-note metadata into a `.pdfpc` sidecar file. */
+/**
+ * Extract the pdfpc speaker-note metadata into a `.pdfpc` sidecar file.
+ *
+ * @param {object} options
+ * @param {string} options.typFile
+ * @param {string} options.buildDir
+ * @param {string} options.outFile
+ * @param {string} [options.typstBinary]  Explicit compiler path.
+ * @param {string} [options.typstPath]    Which Typst to prefer: auto, system, or bundled.
+ * @param {number} [options.timeoutMs]
+ * @returns {Promise<{ ok: boolean, outFile?: string, bytes?: number, entries?: number,
+ *   diagnostics?: object[], stderr?: string }>}  A failed query reports no `outFile`,
+ *   which is why it is optional.
+ */
 export async function writePdfpc({ typFile, buildDir, outFile, typstBinary, typstPath, timeoutMs = 120000 }) {
   const binary = resolveBinary({ configured: typstBinary, preferSystem: typstPath === 'system' })
   const result = await runTypst({
@@ -261,7 +280,7 @@ export async function writePdfpc({ typFile, buildDir, outFile, typstBinary, typs
     if (value === undefined) return { ok: false, diagnostics: [], stderr: 'no pdfpc metadata was found in the document' }
     fs.writeFileSync(outFile, `${JSON.stringify(value, null, 2)}\n`, 'utf8')
     return { ok: true, outFile, bytes: fileSize(outFile) }
-  } catch (error) {
+  } catch (/** @type {any} */ error) {
     return { ok: false, diagnostics: [], stderr: `could not parse pdfpc metadata: ${String(error?.message ?? error)}` }
   }
 }
