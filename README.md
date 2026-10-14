@@ -105,7 +105,7 @@ deck 工具**。没有第二个包要装，插件列表里也没有第二条。
 
 | | |
 |---|---|
-| **DSH** | 任何具备本包所 patch 的插件机制与 Agent 预设机制的版本。bundle patch 针对 `@deepseek-ai/dsh-agent-preset` 与 `@deepseek-ai/dsh-app-boot`；entry group 结构不同的 DSH 不会应用它。**只对当前工作区里的 DSH 验证过，不声明任何支持版本范围。** |
+| **DSH** | 任何具备本包所 patch 的插件机制与 Agent 预设机制的版本。bundle patch **只针对一个包**：`@deepseek-ai/dsh-agent-preset` —— 它是 entry group，所以 bundle patch 能向它插入一行；entry group 结构不同的 DSH 不会应用它。**只对当前工作区里的 DSH 验证过，不声明任何支持版本范围。** |
 | **Node** | `>=18`，来自 `package.json` 的 `engines`。 |
 | **操作系统** | Windows、Linux、macOS。Typst 编译器以六个平台专属可选依赖发布（`win32-x64/arm64`、`linux-x64/arm64`、`darwin-x64/arm64`）。**开发与验证至今只在 Windows 上做过** —— 另外五个平台已声明、可解析，但本项目**未实测**。 |
 | **Typst** | 0.15.1，来自可选依赖，或你自己指定的系统二进制。Touying 0.8.0 要求 0.15.x，大版本不同编译不过。 |

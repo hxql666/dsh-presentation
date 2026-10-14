@@ -126,7 +126,7 @@ starts with these tools" a choice; it is not a sandbox.
 
 | | |
 |---|---|
-| **DSH** | Any version with the plugin and Agent-preset mechanisms this package patches. The bundle patch targets `@deepseek-ai/dsh-agent-preset` and `@deepseek-ai/dsh-app-boot`; a DSH whose entry groups differ will not apply it. Verified against the DSH in this workspace only — no supported-version range is claimed. |
+| **DSH** | Any version with the plugin and Agent-preset mechanisms this package patches. The bundle patch targets **exactly one package**, `@deepseek-ai/dsh-agent-preset` — an entry group, which is why a bundle patch may insert a row into it; a DSH whose entry groups differ will not apply it. Verified against the DSH in this workspace only — no supported-version range is claimed. |
 | **Node** | `>=18`, from `engines` in `package.json`. |
 | **Operating system** | Windows, Linux and macOS. The Typst compiler ships as six platform-specific optional dependencies (`win32-x64/arm64`, `linux-x64/arm64`, `darwin-x64/arm64`). Development and verification to date has been on **Windows only** — the other five are declared and resolvable but untested by this project. |
 | **Typst** | 0.15.1, via the optional dependency, or a system binary you point the plugin at. Touying 0.8.0 requires 0.15.x; a different major will not compile. |
