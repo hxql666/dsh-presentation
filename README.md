@@ -145,6 +145,32 @@ and actually read the rendered images → fix → deliver.
 `cover` `section` `agenda` `bullets` `steps` `cards` `kpis` `timeline`
 `compare` `quote` `table` `code` `image-text` `columns`
 
+### 每种页面的键（14 种）
+
+写错键名**不会报错** —— 页面会照画边框、内容留空。所以 `deck_build` 现在会校验：
+缺必需内容会**直接拒绝构建**；写了本页不读的键会作为 warning 返回，构建照常完成。
+
+| layout | 键 |
+|---|---|
+| `cover` | 读 deck 级字段：`title` `subtitle` `author` `institution` `date` |
+| `section` | `title` 或 `kicker`（必需其一） |
+| `agenda` | `title`, `items[{ text }]` 或字符串数组 |
+| `bullets` | `title`, `lead?`, `items[{ text, detail? }]`, `takeaway?` |
+| `steps` | 同 `bullets`，渲染为编号步骤 |
+| `cards` | `title`, `lead?`, `cards[{ title, eyebrow?, body[], footer? }]`, `perRow?`, `takeaway?` |
+| `kpis` | `title`, `lead?`, `items[{ value, label, note? }]`, `takeaway?` |
+| `timeline` | `title`, `lead?`, `items[{ when, what? }]`, `takeaway?` |
+| `compare` | `title`, `left`, `right`（各为 `{ title?, items[] }`）, `leftTitle?`, `rightTitle?` |
+| `quote` | `quote`（必需）, `author?` |
+| `table` | `title`, `lead?`, `headers[]`, `rows[][]`, `takeaway?` |
+| `code` | `title`, `lead?`, `source`（必需）, `language?`, `takeaway?` |
+| `image-text` | `title`, `body[]` 或 `image?`, `caption?` |
+| `columns` | `title`, `lead?`, `columns[{ title?, items[] }]`, `ratios?` |
+
+每页都可写 `notes`（导出为 pdfpc 演讲者备注）。
+
+**行内强调**：`**粗体**` 与 `*斜体*` 渲染为真正的粗体与斜体；其余特殊字符一律转义，
+写进 deck 的文本无法变成 Typst 语法。`timeline` 的 `label`/`detail` 作为旧拼写仍被接受。
 ### Scenes
 
 A scene is a starting point for a known kind of talk — theme, frame ratio, font

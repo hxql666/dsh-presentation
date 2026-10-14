@@ -28,17 +28,120 @@ export const LAYOUT_HELP = {
   cover: '{ } — cover page; reads title/subtitle/author/institution/date from the deck-level fields.',
   section: '{ title, kicker? } — section divider.',
   agenda: '{ title, items[] } — table of contents.',
-  bullets: '{ title, lead?, items[], takeaway? } — the workhorse content page.',
-  steps: '{ title, lead?, items[], takeaway? } — numbered procedure.',
-  cards: '{ title, lead?, cards[], perRow?, takeaway? } — 2-4 parallel cards.',
-  kpis: '{ title, lead?, items[], takeaway? } — large metric tiles.',
-  timeline: '{ title, lead?, items[], takeaway? } — milestones along a track.',
-  compare: '{ title, left[], right[], leftTitle?, rightTitle? } — two-column contrast.',
-  quote: '{ title, quote, author? } — pull quote.',
+  bullets: '{ title, lead?, items[{ text, detail? }], takeaway? } — the workhorse content page.',
+  steps: '{ title, lead?, items[{ text, detail? }], takeaway? } — numbered procedure.',
+  cards: '{ title, lead?, cards[{ title, eyebrow?, body[], footer? }], perRow?, takeaway? } — 2-4 parallel cards.',
+  kpis: '{ title, lead?, items[{ value, label, note? }], takeaway? } — large metric tiles.',
+  timeline: '{ title, lead?, items[{ when, what? }], takeaway? } — milestones along a track.',
+  compare: '{ title, left, right, leftTitle?, rightTitle? } — two-column contrast; each side is { title?, items[] }.',
+  quote: '{ quote, author? } — pull quote.',
   table: '{ title, lead?, headers[], rows[][], takeaway? } — tabular data.',
   code: '{ title, lead?, source, language?, takeaway? } — a code block.',
   'image-text': '{ title, body[], image?, caption? } — text beside an image.',
-  columns: '{ title, lead?, columns[][], ratios? } — two or three freeform columns.',
+  columns: '{ title, lead?, columns[{ title?, items[] }], ratios? } — two or three freeform columns.',
+}
+
+/**
+ * What each layout needs in order to draw anything.
+ *
+ * A spec that omits these does not fail: the page type draws its frame and leaves
+ * the content empty, so a milestone track appears as bare rules and a metric tile
+ * as a blank card, with no diagnostic anywhere. That silence was a real defect — a
+ * timeline page rendered as three horizontal lines because the model reasonably
+ * guessed `when`/`what` while only `label`/`detail` were read, and nothing said so.
+ *
+ * Each entry maps a layout to `[what, test]` pairs, where `test` reports whether
+ * the frame carries usable content for that part of the page.
+ */
+const NON_EMPTY = (value) => value !== undefined && value !== null && String(value).trim() !== ''
+const hasText = (value) => {
+  if (Array.isArray(value)) return value.some((entry) => hasText(entry))
+  if (value !== null && typeof value === 'object') return Object.values(value).some((entry) => hasText(entry))
+  return NON_EMPTY(value)
+}
+const atLeastOne = (key) => (frame) => Array.isArray(frame[key]) && frame[key].some((entry) => hasText(entry))
+
+const REQUIRED_CONTENT = {
+  section: [['title', (f) => NON_EMPTY(f.title) || NON_EMPTY(f.kicker)]],
+  agenda: [['items', atLeastOne('items')]],
+  bullets: [['items', atLeastOne('items')]],
+  steps: [['items', atLeastOne('items')]],
+  cards: [['cards', atLeastOne('cards')]],
+  kpis: [['items', atLeastOne('items')]],
+  timeline: [['items', atLeastOne('items')]],
+  compare: [['left or right', (f) => hasText(f.left) || hasText(f.right)]],
+  quote: [['quote', (f) => NON_EMPTY(f.quote)]],
+  table: [['headers or rows', (f) => hasText(f.headers) || hasText(f.rows)]],
+  code: [['source', (f) => NON_EMPTY(f.source)]],
+  'image-text': [['body or image', (f) => hasText(f.body) || NON_EMPTY(f.image)]],
+  columns: [['columns', atLeastOne('columns')]],
+}
+
+/** Keys a frame may use per layout, so a typo or a wrong guess can be named. */
+const KNOWN_KEYS = {
+  // `layout` and `notes` are read on every page type; `cover` additionally reads
+  // the deck-level fields rather than frame keys.
+  cover: ['layout', 'notes'],
+  section: ['layout', 'title', 'kicker', 'notes'],
+  agenda: ['layout', 'title', 'kicker', 'items', 'notes'],
+  bullets: ['layout', 'title', 'kicker', 'lead', 'items', 'takeaway', 'notes'],
+  steps: ['layout', 'title', 'kicker', 'lead', 'items', 'takeaway', 'notes'],
+  cards: ['layout', 'title', 'kicker', 'lead', 'cards', 'perRow', 'takeaway', 'notes'],
+  kpis: ['layout', 'title', 'kicker', 'lead', 'items', 'takeaway', 'notes'],
+  timeline: ['layout', 'title', 'kicker', 'lead', 'items', 'takeaway', 'notes'],
+  compare: ['layout', 'title', 'kicker', 'lead', 'left', 'right', 'leftTitle', 'rightTitle', 'takeaway', 'notes'],
+  quote: ['layout', 'title', 'quote', 'author', 'notes'],
+  table: ['layout', 'title', 'kicker', 'lead', 'headers', 'rows', 'takeaway', 'notes'],
+  code: ['layout', 'title', 'kicker', 'lead', 'source', 'language', 'takeaway', 'notes'],
+  'image-text': ['layout', 'title', 'kicker', 'lead', 'body', 'image', 'caption', 'notes'],
+  columns: ['layout', 'title', 'kicker', 'lead', 'columns', 'ratios', 'notes'],
+}
+
+/**
+ * Report frames that cannot draw their content, or that use keys no layout reads.
+ *
+ * Returns messages rather than throwing, so the caller decides what is fatal: an
+ * unread key is worth naming but not worth refusing an otherwise working build.
+ *
+ * @param {object} spec A normalised deck spec.
+ * @returns {{errors: string[], warnings: string[]}}
+ */
+export function validateSpec(spec) {
+  const errors = []
+  const warnings = []
+  const slides = Array.isArray(spec?.slides) ? spec.slides : []
+
+  slides.forEach((frame, index) => {
+    const page = `slide ${index + 1}`
+    const layout = String(frame?.layout ?? 'bullets')
+    if (!LAYOUTS.includes(layout)) {
+      errors.push(`${page}: unknown layout ${JSON.stringify(layout)}; use one of ${LAYOUTS.join(', ')}`)
+      return
+    }
+
+    for (const [what, test] of REQUIRED_CONTENT[layout] ?? []) {
+      if (!test(frame)) {
+        errors.push(
+          `${page} (${layout}): ${what} would be empty, so the page renders its frame with nothing in it. ` +
+          `${LAYOUT_HELP[layout]}`,
+        )
+      }
+    }
+
+    const known = KNOWN_KEYS[layout]
+    if (Array.isArray(known)) {
+      for (const key of Object.keys(frame ?? {})) {
+        if (!known.includes(key)) {
+          warnings.push(
+            `${page} (${layout}): ${JSON.stringify(key)} is not read by this layout and has no effect. ` +
+            `Known keys: ${known.filter((k) => k !== 'layout').join(', ')}.`,
+          )
+        }
+      }
+    }
+  })
+
+  return { errors, warnings }
 }
 
 const THEMES = ['metropolis', 'simple', 'university', 'dewdrop', 'stargazer', 'aqua', 'default']
@@ -286,6 +389,25 @@ function buildToolDefinitions(config) {
           ? args.outFile
           : path.join(dir, args.outFile)
 
+      // A deck whose pages could only render empty is refused before anything is
+      // compiled, and keys no layout reads are named. Without this, both fail in
+      // silence: the page draws its frame, the text is missing, and the build
+      // reports success — which is how a milestone track once rendered as bare
+      // rules with no diagnostic.
+      const { errors: specErrors, warnings: specWarnings } = validateSpec(spec)
+      if (specErrors.length > 0) {
+        return jsonSafe({
+          ok: false,
+          error: 'spec-incomplete',
+          problems: specErrors,
+          warnings: specWarnings,
+          message:
+            `The deck spec has ${specErrors.length} page(s) that could not render any content:\n` +
+            `${specErrors.map((line) => `- ${line}`).join('\n')}\n\n` +
+            'Fix the spec and build again. Nothing was compiled.',
+        })
+      }
+
       const result = await buildDeckPdf({
         spec,
         buildDir: path.join(dir, 'build'),
@@ -322,7 +444,9 @@ function buildToolDefinitions(config) {
         pages: result.pages,
         bytes: result.bytes,
         diagnostics: result.diagnostics,
-        warnings: (result.warnings ?? []).map((w) => w.message),
+        // Keys the layout does not read are reported but never blocking: the deck
+        // builds, and the model learns that a key had no effect.
+        warnings: [...(result.warnings ?? []).map((w) => w.message), ...specWarnings],
         overflow: (result.overflow ?? []).map((w) => w.message),
         stderr: result.ok ? undefined : result.stderr,
       })

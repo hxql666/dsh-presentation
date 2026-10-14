@@ -242,12 +242,17 @@
 )
 
 /// A horizontal milestone track.
+/// A milestone track. Each item is `(when, what)`; the connector line is drawn
+/// above the label so the milestones read as points on one track.
 #let deck-timeline(items, accent: _accent) = {
   let cells = ()
   for item in items {
-    let lines = (box(width: 100%, height: 3pt, fill: accent), text(weight: "bold", size: 0.95em, item.label))
-    if item.at("detail", default: none) != none {
-      lines.push(text(size: 0.84em, fill: _muted, item.detail))
+    let lines = (
+      box(width: 100%, height: 3pt, fill: accent),
+      text(weight: "bold", size: 0.95em, item.at("when", default: none)),
+    )
+    if item.at("what", default: none) != none {
+      lines.push(text(size: 0.84em, fill: _muted, item.at("what")))
     }
     cells.push(block(
       width: 100%,

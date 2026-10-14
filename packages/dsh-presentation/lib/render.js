@@ -215,12 +215,22 @@ function kpiItems(items) {
   }))
 }
 
-/** Emit timeline items. */
+/**
+ * Emit timeline items.
+ *
+ * `when` / `what` are the documented keys. `label` / `detail` are accepted too:
+ * they were the original names, and a spec that used them should keep rendering
+ * rather than silently drawing empty milestones. Silence was the real defect — the
+ * layout drew its rules and printed nothing where the text should be, with no
+ * diagnostic — which is why `validateSpec` now rejects a milestone with neither.
+ */
 function timelineItems(items) {
   if (!Array.isArray(items)) return '()'
   return arr(items.map((item) => {
     const m = item ?? {}
-    return `(label: ${t(m.label ?? '')}, detail: ${t(m.detail)})`
+    const when = m.when ?? m.label ?? ''
+    const what = m.what ?? m.detail
+    return `(when: ${t(when)}, what: ${t(what)})`
   }))
 }
 
