@@ -4,7 +4,11 @@
 # card in Settings → Agent preset and a fifth entry in the new-session mode
 # picker. It is deliberately the standard capability set with three changes:
 #
-#   * `dsh-presentation-v5` is added, which is what makes the deck tools exist.
+#   * The presentation plugin is added, which is what makes the deck tools exist.
+#     A local install mounts it under its installed identity, such as
+#     `dsh-presentation-v6`; the published package is named
+#     `@hxql/dsh-presentation`. The row below carries the name to use, and names
+#     it once so the two cannot drift apart.
 #   * The shell rows are dropped. Building a deck needs the workspace, not a
 #     terminal: the plugin resolves and runs the Typst compiler itself, so a
 #     shell would only widen the surface a presentation session has to reason
@@ -93,11 +97,13 @@
           - id: present
             name: '@deepseek-ai/dsh-tool-present'
           - id: presentation
-            # This name must match how the plugin is installed. A local install
-            # uses a versioned identity (`dsh-presentation-v6`) because the host
-            # caches an ESM module by resolved URL, so editing an already-imported
-            # path is never re-read; change this value with the installed
-            # identity. Installing the published package uses the name above.
+            # This name is how the plugin is resolved, and it must match the
+            # installed package. Installing from npm resolves the name above. A
+            # local development install is mounted under a versioned identity
+            # (`dsh-presentation-v6`) — the host caches an ESM module by resolved
+            # URL, so editing an already-imported path is never re-read — and
+            # reaches this row through a junction named for the package. Either
+            # way the value here is the package name, never the local identity.
             name: '@hxql/dsh-presentation'
             config:
               # `section` is required by the plugin and is the only place this
