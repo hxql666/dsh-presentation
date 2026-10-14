@@ -38,8 +38,10 @@ export const LAYOUT_HELP = {
   quote: '{ quote, author? } — pull quote.',
   table: '{ title, lead?, headers[], rows[][], takeaway? } — tabular data.',
   code: '{ title, lead?, source, language?, takeaway? } — a code block.',
+  image: '{ title, image, caption?, credit?, takeaway? } — a full-width picture page.',
   'image-text': '{ title, body[], image?, caption? } — text beside an image.',
   columns: '{ title, lead?, columns[{ title?, items[] }], ratios? } — two or three freeform columns.',
+  sources: '{ title, lead?, items[] } — a numbered reference list.',
 }
 
 /**
@@ -74,8 +76,10 @@ const REQUIRED_CONTENT = {
   quote: [['quote', (f) => NON_EMPTY(f.quote)]],
   table: [['headers or rows', (f) => hasText(f.headers) || hasText(f.rows)]],
   code: [['source', (f) => NON_EMPTY(f.source)]],
+  image: [['image', (f) => NON_EMPTY(f.image)]],
   'image-text': [['body or image', (f) => hasText(f.body) || NON_EMPTY(f.image)]],
   columns: [['columns', atLeastOne('columns')]],
+  sources: [['items', atLeastOne('items')]],
 }
 
 /** Keys a frame may use per layout, so a typo or a wrong guess can be named. */
@@ -94,8 +98,10 @@ const KNOWN_KEYS = {
   quote: ['layout', 'title', 'quote', 'author', 'notes'],
   table: ['layout', 'title', 'kicker', 'lead', 'headers', 'rows', 'takeaway', 'notes'],
   code: ['layout', 'title', 'kicker', 'lead', 'source', 'language', 'takeaway', 'notes'],
+  image: ['layout', 'title', 'kicker', 'lead', 'image', 'caption', 'credit', 'takeaway', 'notes'],
   'image-text': ['layout', 'title', 'kicker', 'lead', 'body', 'image', 'caption', 'notes'],
   columns: ['layout', 'title', 'kicker', 'lead', 'columns', 'ratios', 'notes'],
+  sources: ['layout', 'title', 'kicker', 'lead', 'items', 'takeaway', 'notes'],
 }
 
 /**

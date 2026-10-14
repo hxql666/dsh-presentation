@@ -140,12 +140,12 @@ and actually read the rendered images → fix → deliver.
 | `deck_export` | `handout` print form / `notes` `.pdfpc` speaker-note sidecar. |
 | `deck_scaffold` | Writes the generated Typst source without compiling. |
 
-### Page layouts
+### Page layouts (16)
 
 `cover` `section` `agenda` `bullets` `steps` `cards` `kpis` `timeline`
-`compare` `quote` `table` `code` `image-text` `columns`
+`compare` `quote` `table` `code` `image` `image-text` `columns` `sources`
 
-### 每种页面的键（14 种）
+### 每种页面的键（16 种）
 
 写错键名**不会报错** —— 页面会照画边框、内容留空。所以 `deck_build` 现在会校验：
 缺必需内容会**直接拒绝构建**；写了本页不读的键会作为 warning 返回，构建照常完成。
@@ -164,13 +164,23 @@ and actually read the rendered images → fix → deliver.
 | `quote` | `quote`（必需）, `author?` |
 | `table` | `title`, `lead?`, `headers[]`, `rows[][]`, `takeaway?` |
 | `code` | `title`, `lead?`, `source`（必需）, `language?`, `takeaway?` |
+| `image` | `title`, `image`（必需）, `caption?`, `credit?`, `takeaway?` |
 | `image-text` | `title`, `body[]` 或 `image?`, `caption?` |
 | `columns` | `title`, `lead?`, `columns[{ title?, items[] }]`, `ratios?` |
+| `sources` | `title`, `lead?`, `items[]`（编号参考列表）, `takeaway?` |
 
 每页都可写 `notes`（导出为 pdfpc 演讲者备注）。
 
 **行内强调**：`**粗体**` 与 `*斜体*` 渲染为真正的粗体与斜体；其余特殊字符一律转义，
 写进 deck 的文本无法变成 Typst 语法。`timeline` 的 `label`/`detail` 作为旧拼写仍被接受。
+
+**图片必须放在 deck 目录里**：`image` 与 `image-text` 的 `image` 是相对 deck 目录的路径，且不能越出该目录 —— Typst 以 deck 目录为 `--root` 编译，越界路径会被拒绝（`would escape the project root`）。这条限制同时是一道安全边界：一份 deck 无法被用来读取机器上的其它文件。把图片拷进 deck 目录后按文件名引用即可：
+
+```jsonc
+{ "layout": "image", "title": "现场照片", "image": "photo.png",
+  "caption": "照片说明", "credit": "来源：某某" }
+```
+
 ### Scenes
 
 A scene is a starting point for a known kind of talk — theme, frame ratio, font

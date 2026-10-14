@@ -24,8 +24,10 @@ export const LAYOUTS = [
   'quote',
   'table',
   'code',
+  'image',
   'image-text',
   'columns',
+  'sources',
 ]
 
 /** Locales a deck may select; the keys of the template's `dsh-locales`. */
@@ -293,11 +295,20 @@ function slideLiteral(slide) {
       // requires a string.
       push('language', q(slide.language ?? 'typ'))
       break
+    case 'image':
+      // A path, so a string rather than content.
+      push('image', slide.image === undefined ? undefined : q(String(slide.image)))
+      push('caption', t(slide.caption))
+      push('credit', t(slide.credit))
+      break
     case 'image-text':
       push('body', lines(slide.body))
       // A path, so also a string rather than content.
       push('image', slide.image === undefined ? undefined : q(String(slide.image)))
       push('caption', t(slide.caption))
+      break
+    case 'sources':
+      push('items', lines(slide.items))
       break
     case 'columns': {
       const columns = Array.isArray(slide.columns) ? slide.columns : []

@@ -297,6 +297,60 @@
 
 // --- image and text --------------------------------------------------------
 
+/// A full-bleed image page: the picture is the page, with the title and caption
+/// laid over a scrim so they stay readable on any image.
+///
+/// The caption sits opposite the title, and the credit is a small line beneath it,
+/// because an image page in a document deck usually has to say where the image came
+/// from — which a figure caption alone does not cover.
+///
+/// The parameter is named `source`, not `image`: naming it `image` would shadow
+/// Typst's own `image()` function, and the call below would then be an attempt to
+/// call a string.
+#let deck-image-page(source, title: none, caption: none, credit: none) = block(
+  width: 100%,
+  {
+    if source == none {
+      // No image named: draw a placeholder so the page still reads as a picture
+      // page rather than an empty one, and so the reviewer can see what is missing.
+      box(
+        width: 100%,
+        height: 12em,
+        radius: 0.4em,
+        fill: _soft,
+        align(center + horizon, deck-caption("image")),
+      )
+    } else {
+      image(source, width: 100%, height: 11em, fit: "cover")
+    }
+    if title != none and title != "" {
+      block(above: 0.7em, text(size: 1.3em, weight: "bold", fill: _accent, title))
+    }
+    if caption != none {
+      block(above: 0.3em, text(size: 0.9em, fill: _muted, caption))
+    }
+    if credit != none {
+      block(above: 0.15em, deck-caption(credit))
+    }
+  },
+)
+
+/// A numbered reference list, for the sources behind a document-style deck.
+#let deck-sources(items, accent: _accent) = {
+  let rows = ()
+  for (index, item) in items.enumerate() {
+    rows.push(
+      grid(
+        columns: (1.6em, 1fr),
+        align: (right + top, left + top),
+        text(size: 0.82em, weight: "bold", fill: accent, str(index + 1)),
+        text(size: 0.9em, item),
+      ),
+    )
+  }
+  block(width: 100%, stack(dir: ttb, spacing: 0.55em, ..rows))
+}
+
 /// A two-column image/text composition.
 #let deck-image-text(body, image: none, ratio: (1.15fr, 1fr), caption: none) = block(
   width: 100%,

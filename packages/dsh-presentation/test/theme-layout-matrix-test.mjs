@@ -33,8 +33,10 @@ const FRAMES = [
   { layout: 'quote', quote: '一句话引用。', author: '某人' },
   { layout: 'table', title: '表格', headers: ['列一', '列二'], rows: [['1', '2']] },
   { layout: 'code', title: '代码', source: 'let x = 1', language: 'typ', takeaway: '结论' },
+  { layout: 'image', title: '图片页', caption: '图注', credit: '来源：某处' },
   { layout: 'image-text', title: '图文', body: ['正文'], caption: '图注' },
   { layout: 'columns', title: '分栏', columns: [{ title: '左', items: ['a'] }, { title: '右', items: ['b'] }] },
+  { layout: 'sources', title: '参考', items: ['某作者. 某文献. 2026.', '另一份资料. 2025.'] },
 ]
 
 let failures = 0
@@ -63,8 +65,26 @@ for (const theme of THEMES) {
 }
 
 console.log(`  combinations tried: ${THEMES.length * FRAMES.length}`)
+console.log(`  layouts covered: ${FRAMES.length}`)
 console.log(`  failures: ${failures}`)
 for (const row of rows) console.log(row)
+
+// The point of a matrix is that it covers every layout the plugin advertises. A
+// layout missing from this list is a layout no test builds under any theme, which
+// is how the theme collision survived until a user hit it.
+{
+  const { LAYOUTS } = await import('../lib/render.js')
+  const covered = new Set(FRAMES.map((frame) => frame.layout))
+  const missing = LAYOUTS.filter((layout) => !covered.has(layout))
+  console.log('')
+  console.log(`  advertised layouts: ${LAYOUTS.length}`)
+  if (missing.length > 0) {
+    failures += 1
+    console.log(`  FAIL not covered by this matrix: ${missing.join(', ')}`)
+  } else {
+    console.log('  OK   every advertised layout is covered')
+  }
+}
 
 console.log('')
 console.log(failures === 0

@@ -183,6 +183,21 @@
         ..spec.at("columns", default: ()).map(col => deck-lines(col)),
       )
     ]
+  } else if layout == "image" {
+    slide(composer: deck-composer)[#deck-page-title(title)
+      #deck-image-page(
+        spec.at("image", default: none),
+        caption: spec.at("caption", default: none),
+        credit: spec.at("credit", default: none),
+      )
+      #if takeaway != none { deck-takeaway(takeaway) }
+    ]
+  } else if layout == "sources" {
+    slide(composer: deck-composer)[#deck-page-title(title)
+      #if lead != none { deck-lead(lead) }
+      #deck-sources(spec.at("items", default: ()))
+      #if takeaway != none { deck-takeaway(takeaway) }
+    ]
   } else {
     // "bullets" and any unmodelled layout degrade to a bullet page instead of
     // failing the whole compilation.
