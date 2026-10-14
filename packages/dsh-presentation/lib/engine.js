@@ -489,8 +489,13 @@ export function parseOverflowWarnings(stderr) {
 }
 
 /**
- * Count PDF pages without a parser: the page tree carries one `/Type /Page`
- * object per page (never `/Pages`, which is excluded by the trailing guard).
+ * Count PDF pages without a parser.
+ *
+ * The page tree carries one `/Type /Page` object per page, and Typst also emits a
+ * `/Type /PageLabel` object per page for the viewer's page numbering. A guard
+ * that only rejects a following `s` (for `/Pages`) therefore counts every page
+ * twice, because `PageLabel` continues with `L`. Anything alphanumeric directly
+ * after `Page` means a different object type, so that is what is rejected.
  *
  * @param {string} pdfPath
  * @returns {number|undefined}
@@ -499,18 +504,17 @@ export function countPdfPages(pdfPath) {
   try {
     const buf = fs.readFileSync(pdfPath)
     let count = 0
-    const needle = Buffer.from('/Type /Page')
-    const alt = Buffer.from('/Type/Page')
-    for (const n of [needle, alt]) {
+    const needles = [Buffer.from('/Type /Page'), Buffer.from('/Type/Page')]
+    for (const needle of needles) {
       let from = 0
       for (;;) {
-        const at = buf.indexOf(n, from)
+        const at = buf.indexOf(needle, from)
         if (at === -1) break
-        const next = buf[at + n.length]
-        // `/Pages` continues with `s`; a page object ends or continues with
-        // whitespace or a delimiter.
-        if (next !== 0x73) count += 1
-        from = at + n.length
+        const next = buf[at + needle.length]
+        // `undefined` is end of file, which cannot continue a longer type name.
+        const longerName = next !== undefined && /[A-Za-z0-9]/.test(String.fromCharCode(next))
+        if (!longerName) count += 1
+        from = at + needle.length
       }
       if (count > 0) break
     }

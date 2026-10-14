@@ -33,7 +33,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "node test/schema-gate.mjs && node test/assemble-test.mjs && node test/final-sweep.mjs && node test/handout-test.mjs && node test/locale-test.mjs && node test/system-typst-test.mjs && node test/scene-test.mjs && node test/scene-build-test.mjs && node test/encoding-audit.mjs",
+    "test": "node test/schema-gate.mjs && node test/assemble-test.mjs && node test/final-sweep.mjs && node test/handout-test.mjs && node test/locale-test.mjs && node test/system-typst-test.mjs && node test/scene-test.mjs && node test/scene-build-test.mjs && node test/pagecount-test.mjs && node test/stale-preview-test.mjs && node test/encoding-audit.mjs",
     "prepublishOnly": "node test/schema-gate.mjs"
   },
   "repository": {

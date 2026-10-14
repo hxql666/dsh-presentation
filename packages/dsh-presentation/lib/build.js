@@ -213,7 +213,32 @@ export async function buildDeckPdf({ spec, buildDir, outFile, typstBinary, typst
 export async function renderDeckPages({ typFile, buildDir, outputPattern, ppi = 110, pages, typstBinary, typstPath, timeoutMs = 180000 }) {
   const binary = resolveBinary({ configured: typstBinary, preferSystem: typstPath === 'system' })
   // Typst writes into an existing directory only; create it before compiling.
-  ensureDir(path.dirname(outputPattern.replace('{p}', '1')))
+  const dir = path.dirname(outputPattern.replace('{p}', '1'))
+  ensureDir(dir)
+
+  // Remove this pattern's previous output first.
+  //
+  // Typst overwrites the pages it renders and leaves every other file alone, so a
+  // later render of fewer pages — a deck edited down from 16 frames to 7, or a
+  // render of just pages 1-5 — used to leave the older images sitting beside the
+  // new ones. The visual self-review step then reads them: it inspects pages that
+  // are not in the current deck, and can "fix" a problem the deck no longer has.
+  // Only files matching this pattern are touched, so a neighbouring directory or
+  // an unrelated image is safe.
+  const stem = path.basename(outputPattern).replace('{p}', '')
+  const prefix = stem.endsWith('.png') ? stem.slice(0, -4) : stem
+  const stale = fs.existsSync(dir)
+    ? fs.readdirSync(dir).filter((name) => name.startsWith(prefix) && name.endsWith('.png'))
+    : []
+  for (const name of stale) {
+    try {
+      fs.rmSync(path.join(dir, name), { force: true })
+    } catch {
+      // A locked file is not worth failing the render over; the count below will
+      // still report only the pages that were asked for.
+    }
+  }
+
   const args = [
     'compile',
     '--root', buildDir,
@@ -235,16 +260,23 @@ export async function renderDeckPages({ typFile, buildDir, outputPattern, ppi = 
     return { files: [], diagnostics, stderr: result.stderr.slice(-8000) }
   }
 
-  const dir = path.dirname(outputPattern.replace('{p}', '1'))
-  const base = path.basename(outputPattern).replace('{p}', '')
-  const files = fs.existsSync(dir)
-    ? fs
-        .readdirSync(dir)
-        .filter((name) => name.startsWith(base.slice(0, Math.max(0, base.length - 4))) || /^page-.*\.png$/.test(name))
-        .filter((name) => name.endsWith('.png'))
-        .sort()
-        .map((name) => path.join(dir, name))
-    : []
+  // Report exactly the requested pages that now exist on disk, rather than every
+  // PNG in the directory. Asking for pages 1-5 must not claim pages 6-8 exist.
+  const wanted = Array.isArray(pages) && pages.length > 0 ? pages : undefined
+  const files = []
+  if (wanted !== undefined) {
+    for (const page of wanted) {
+      const file = outputPattern.replace('{p}', String(page))
+      if (fs.existsSync(file)) files.push(file)
+    }
+  } else {
+    // No explicit range: take the contiguous run Typst produced, starting at 1.
+    for (let page = 1; ; page += 1) {
+      const file = outputPattern.replace('{p}', String(page))
+      if (!fs.existsSync(file)) break
+      files.push(file)
+    }
+  }
   return { files, diagnostics, stderr: result.stderr.slice(-8000) }
 }
 
