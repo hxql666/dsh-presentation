@@ -150,35 +150,6 @@ fills in what the spec leaves unset, so an explicit choice always wins.
 All seven come from Touying: `metropolis` (default) `simple` `university`
 `dewdrop` `stargazer` `aqua` `default`.
 
-## Security and privacy
-
-Worth stating plainly, because the plugin runs a native compiler and writes
-files:
-
-- **No credentials, ever.** The plugin has no network code, no account access,
-  and no telemetry. It cannot reach a model provider or an API of any kind.
-- **The compiler is verified before it runs.** The bundled Typst binary is
-  SHA-256 checked against the digest its package publishes (itself derived from
-  the official Typst release asset); a mismatch is a refusal, not a warning.
-- **Compilation is confined.** Every build runs with `--root` set to its own
-  build directory inside the session workspace, so a document cannot read or
-  write outside it.
-- **Your Typst store is left alone.** Packages resolve from the plugin's
-  `vendor/` directory via `--package-path`. The global
-  `%LOCALAPPDATA%\typst` store is never written.
-- **Bounded resources.** Per-compilation timeout, output size cap, and page cap
-  are all configurable and enforced.
-- **What it does write:** a deck directory (`deck/` under the session workspace
-  by default, configurable) containing the spec, the generated Typst source, the
-  compiled PDF, and preview PNGs. Nothing else.
-- **What it never touches:** `~/.dsh/.credentials.yaml`, session logs belonging
-  to other sessions, and anything outside the session workspace.
-
-No API key, account name, password, session transcript, or personal path is
-present in this repository — the test suite scans for exactly that (see
-`packages/dsh-presentation/test/encoding-audit.mjs` and the checks noted in each
-package README).
-
 ## Releasing
 
 Publishing happens in CI, not from a laptop.
@@ -338,18 +309,6 @@ npm install
 
 然后直接说需求。预期流程：`deck_status` 查页型/主题/场景 → 排页序 → `deck_build` →
 `deck_check` 渲染并**实际读图检视** → 修 → 交付。
-
-## 安全与隐私
-
-- **绝不接触凭据**：插件无任何网络代码、无账号访问、无遥测，无法访问任何模型服务或 API
-- **编译器先校验再执行**：内置 Typst 二进制做 SHA-256 比对（与包内声明、官方 release 资产一致），不匹配即拒绝执行
-- **编译被限定**：每次构建 `--root` 指向会话工作区内的独立构建目录，文档无法越界读写
-- **不动你的 Typst 包库**：包从插件自带的 `vendor/` 经 `--package-path` 解析，绝不写全局 `%LOCALAPPDATA%\typst`
-- **资源有界**：编译超时、输出体积上限、页数上限均可配置且强制生效
-- **它只写**：deck 目录（默认会话工作区下的 `deck/`，可配置）里的 spec、生成的 Typst 源码、PDF、预览 PNG。仅此而已
-- **它绝不碰**：`~/.dsh/.credentials.yaml`、其他会话的日志、会话工作区之外的任何东西
-
-本仓库不含任何 API 密钥、账号名、密码、会话记录或个人路径。
 
 ## 测试
 
