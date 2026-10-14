@@ -1,7 +1,6 @@
 {
   "name": "@hxql666/dsh-presentation",
   "version": "0.1.0",
-  "private": true,
   "description": "Presentation-document mode for DeepSeek Harness: author Typst/Touying decks as structured data, compile to PDF with a visual self-review loop. · DSH 演示文档模式：以结构化数据驱动 Typst/Touying 生成 PDF 演示文稿。",
   "type": "module",
   "license": "MIT",
@@ -32,5 +31,28 @@
   ],
   "engines": {
     "node": ">=18"
-  }
+  },
+  "scripts": {
+    "test": "node test/schema-gate.mjs && node test/assemble-test.mjs && node test/final-sweep.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hxql666/dsh-presentation.git",
+    "directory": "packages/dsh-presentation"
+  },
+  "homepage": "https://github.com/hxql666/dsh-presentation#readme",
+  "bugs": {
+    "url": "https://github.com/hxql666/dsh-presentation/issues"
+  },
+  "keywords": [
+    "deepseek",
+    "harness",
+    "dsh",
+    "dsh-plugin",
+    "typst",
+    "touying",
+    "pdf",
+    "presentation",
+    "slides"
+  ]
 }

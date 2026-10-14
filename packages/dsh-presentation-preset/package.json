@@ -1,7 +1,6 @@
 {
   "name": "@hxql666/dsh-presentation-preset",
   "version": "0.1.0",
-  "private": true,
   "description": "Agent preset \"presentation\" for DeepSeek Harness: the deck-authoring capability set, selectable from Settings → Agent preset and the new-session mode picker.",
   "type": "module",
   "license": "MIT",
@@ -10,16 +9,32 @@
       "patch": "./cordis.patch.yml"
     }
   },
-  "dependencies": {
-    "@hxql666/dsh-presentation": "workspace:*"
-  },
   "files": [
-    "cordis.patch.yml"
+    "cordis.patch.yml",
+    "README.md",
+    "test"
   ],
   "scripts": {
     "test": "node test/preset-validate.cjs"
   },
   "engines": {
     "node": ">=18"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hxql666/dsh-presentation.git",
+    "directory": "packages/dsh-presentation-preset"
+  },
+  "homepage": "https://github.com/hxql666/dsh-presentation#readme",
+  "bugs": {
+    "url": "https://github.com/hxql666/dsh-presentation/issues"
+  },
+  "keywords": [
+    "deepseek",
+    "harness",
+    "dsh",
+    "dsh-plugin",
+    "agent-preset",
+    "presentation"
+  ]
 }

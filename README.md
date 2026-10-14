@@ -46,26 +46,66 @@ preset as well adds the picker entry.
 
 ## Install
 
-Two separate packages. Installing the preset alone is the usual choice: it
-declares the plugin as a dependency, so the plugin comes with it.
+Two packages, and they are installed separately:
+
+| Package | What it gives you |
+|---|---|
+| `@hxql666/dsh-presentation` | the plugin: the `/deck` mode and the five deck tools |
+| `@hxql666/dsh-presentation-preset` | the Agent preset: the card in **Settings → Agent preset** and the mode picker |
+
+Install only the plugin and `/deck` works inside whatever preset you already
+use. Add the preset to get the picker entry as well.
+
+### From npm (recommended)
 
 ```bash
-# Plugin only — gives you /deck inside whatever preset you already use
+# the plugin, which is the part that does the work
 dsh plugin --profile desktop add @hxql666/dsh-presentation
 
-# Plugin + the picker entry (brings the plugin with it)
+# optional: the Agent preset, for the mode picker
 dsh plugin --profile desktop add @hxql666/dsh-presentation-preset
 ```
 
-From a clone, point at the directories instead:
+### From a clone
 
 ```bash
+git clone https://github.com/hxql666/dsh-presentation
+cd dsh-presentation
+pnpm install          # links the workspace and fetches the Typst binary
 dsh plugin --profile desktop add "$PWD/packages/dsh-presentation"
 dsh plugin --profile desktop add "$PWD/packages/dsh-presentation-preset"
 ```
 
-Then **restart the app**. Installed plugins load at startup, and a replaced
-package needs a fresh module generation.
+### Then restart the app
+
+Installed plugins load at startup, and a replaced package needs a fresh module
+generation before its new code is used.
+
+### Why not a git URL
+
+A plugin that ships a platform binary does not install reliably from a git URL,
+and this was measured rather than assumed:
+
+| Attempt | Result |
+|---|---|
+| `dsh plugin add <local clone>/packages/dsh-presentation` | works; the binary resolves |
+| a packaged tarball of the plugin | works; `verified=true`, a deck builds |
+| `npm install github:hxql666/dsh-presentation` | **fails** — npm clones the repository and runs its root `prepare` |
+| `npm install <repo archive>.tar.gz` | installs, but **`optionalDependencies` are not fetched**, so there is no Typst binary and every build reports `binary-unavailable` |
+
+If a build ever reports `binary-unavailable`, the platform package did not
+install. Fix it either way:
+
+```bash
+# inside the installed package directory
+npm install
+
+# or point the plugin at a Typst 0.15.1+ binary you already have
+#   plugin config:  typstBinaryPath: /absolute/path/to/typst
+```
+
+The second option also covers platforms with no bundled binary: 32-bit systems,
+`linux-armv7`, and BSD.
 
 ## Use
 
@@ -208,11 +248,46 @@ Typst + Touying 编译成 PDF，并把页面**渲染回图片让 agent 亲眼看
 
 ## 安装
 
+两个包，**分别安装**：
+
+| 包 | 作用 |
+|---|---|
+| `@hxql666/dsh-presentation` | 插件本体：`/deck` 模式与五个 deck 工具 |
+| `@hxql666/dsh-presentation-preset` | Agent 预设：**设置 → Agent 预设** 与新对话模式选择器里的卡片 |
+
+只装插件，`/deck` 在你现有预设下就能用；再装预设才多出模式选择器里的入口。
+
 ```bash
-dsh plugin --profile desktop add <包名>
+# 从 npm（推荐）
+dsh plugin --profile desktop add @hxql666/dsh-presentation
+dsh plugin --profile desktop add @hxql666/dsh-presentation-preset
+
+# 或从一个克隆
+git clone https://github.com/hxql666/dsh-presentation
+cd dsh-presentation
+pnpm install
+dsh plugin --profile desktop add "$PWD/packages/dsh-presentation"
+dsh plugin --profile desktop add "$PWD/packages/dsh-presentation-preset"
 ```
 
-装完**必须重启应用**：已安装插件在启动时加载，替换包需要新的模块代。
+装完**必须重启应用**才会加载新的模块代。
+
+**为什么不能直接用 git URL**：实测过 —— 带平台二进制的插件从 git URL 装不可靠。
+`npm install github:...` 会因为 npm 克隆整仓并执行根的 `prepare` 而失败；
+装仓库的 archive tarball 则**不会拉取 `optionalDependencies`**，于是没有 Typst 二进制，
+每次构建都报 `binary-unavailable`。
+
+若真的遇到 `binary-unavailable`，二选一：
+
+```bash
+# 在已安装的包目录里
+npm install
+
+# 或在插件配置里指向自备的 Typst 0.15.1+ 二进制
+#   typstBinaryPath: /absolute/path/to/typst
+```
+
+后者也覆盖没有内置二进制的平台：32 位系统、`linux-armv7`、BSD。
 
 ## 使用
 
