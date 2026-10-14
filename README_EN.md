@@ -195,8 +195,12 @@ inside it. That restriction is deliberate: `outDir` is model-supplied, so it is
 untrusted, and **Typst's `--root` confines what a document may read, not where the
 compiler writes** — verified by rendering with a pattern outside the compile root,
 and the files are written outside it. The containment check in the tool layer is
-therefore the only thing standing between a deck spec and an arbitrary write, so it
-is a refusal rather than a warning.
+therefore the last hard refusal between a deck spec and an arbitrary write, and it is
+a refusal rather than a warning.
+
+"The last" and not "the only": the first pass of that check is not sufficient on its
+own, as the next paragraph records. Two layers, and the second one exists because the
+first was measured to be bypassable.
 
 The check runs twice, and the second pass is the one that took a measured escape to
 find. The first compares path strings; that catches every textual form — `..`,
