@@ -1,6 +1,6 @@
 {
   "name": "@hxql/dsh-presentation",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Presentation-document mode for DeepSeek Harness: author Typst/Touying decks as structured data, compile to PDF with a visual self-review loop. · DSH 演示文档模式：以结构化数据驱动 Typst/Touying 生成 PDF 演示文稿。",
   "type": "module",
   "license": "MIT",
@@ -28,6 +28,7 @@
     "vendor",
     "cordis.patch.yml",
     "README.md",
+    "README_EN.md",
     "LICENSE",
     "THIRD-PARTY-NOTICES.md"
   ],
@@ -35,7 +36,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "node test/schema-gate.mjs && node test/assemble-test.mjs && node test/final-sweep.mjs && node test/handout-test.mjs && node test/locale-test.mjs && node test/system-typst-test.mjs && node test/scene-test.mjs && node test/scene-build-test.mjs && node test/pagecount-test.mjs && node test/stale-preview-test.mjs && node test/escape-vectors-test.mjs && node test/outdir-test.mjs && node test/theme-layout-matrix-test.mjs && node test/visual-title-test.mjs && node test/bold-test.mjs && node test/timeline-test.mjs && node test/build-tool-test.mjs && node test/density-test.mjs && node test/new-layouts-test.mjs && node test/vector-export-test.mjs && node test/font-stack-test.mjs && node test/determinism-test.mjs && node test/license-shipping-test.mjs && node test/encoding-audit.mjs",
+    "test": "node test/schema-gate.mjs && node test/assemble-test.mjs && node test/final-sweep.mjs && node test/handout-test.mjs && node test/locale-test.mjs && node test/system-typst-test.mjs && node test/scene-test.mjs && node test/scene-build-test.mjs && node test/pagecount-test.mjs && node test/stale-preview-test.mjs && node test/escape-vectors-test.mjs && node test/outdir-test.mjs && node test/theme-layout-matrix-test.mjs && node test/visual-title-test.mjs && node test/bold-test.mjs && node test/timeline-test.mjs && node test/build-tool-test.mjs && node test/density-test.mjs && node test/new-layouts-test.mjs && node test/vector-export-test.mjs && node test/font-stack-test.mjs && node test/determinism-test.mjs && node test/license-shipping-test.mjs && node test/readme-parity-test.mjs && node test/encoding-audit.mjs",
     "prepublishOnly": "node test/schema-gate.mjs"
   },
   "repository": {

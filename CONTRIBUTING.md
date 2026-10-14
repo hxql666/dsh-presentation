@@ -64,7 +64,10 @@ The checklist, in order:
    two are what stop a key mistake from failing in silence.
 5. `test/theme-layout-matrix-test.mjs` — add the frame. The matrix asserts it covers
    every advertised layout, so forgetting this fails the suite.
-6. `README.md` — the row in the key table, and the layout count.
+6. `README.md` **and** `README_EN.md` — the row in the key table, and the layout
+   count. Both, in the same change: `test/readme-parity-test.mjs` compares the two
+   documents' heading skeleton, table row counts, code blocks, links and quoted
+   measurements, so adding a section to one and not the other fails the suite.
 7. `CHANGELOG.md` — under a new version.
 
 ## Changing the tool surface
@@ -98,6 +101,10 @@ Security reports go to [SECURITY.md](SECURITY.md) instead.
 ## Style
 
 Match what is there. Comments explain *why*, and state the measurement or the
-failure that motivated the code. The language is English in code and comments;
-the README is bilingual; commit messages are English and describe the defect and
-the evidence, not the diff.
+failure that motivated the code. Code and comments are English. Commit messages are
+English and describe the defect and the evidence, not the diff.
+
+There are two READMEs: `README.md` is Simplified Chinese and is the default (it is
+what npm and GitHub show), `README_EN.md` is English. Chinese is the primary
+language for user-facing prose; keep the two in step, and let the parity test tell
+you when they are not.
