@@ -33,7 +33,8 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "node test/schema-gate.mjs && node test/assemble-test.mjs && node test/final-sweep.mjs"
+    "test": "node test/schema-gate.mjs && node test/assemble-test.mjs && node test/final-sweep.mjs",
+    "prepublishOnly": "node test/schema-gate.mjs"
   },
   "repository": {
     "type": "git",

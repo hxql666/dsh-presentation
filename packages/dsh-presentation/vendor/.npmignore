@@ -1,0 +1,9 @@
+# Vendored third-party files are kept byte-identical to upstream in the
+# repository, but the two largest groups of files exist only to render the
+# upstream project's own README on a registry page. Excluding them here keeps
+# the repository faithful while sparing every installer 417 KB of decoration.
+#
+# Nothing under `src/`, `themes/`, or `lib.typ` is excluded: those are the files
+# the compiler actually imports.
+assets/
+changelog.md
