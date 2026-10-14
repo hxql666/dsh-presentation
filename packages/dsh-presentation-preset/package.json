@@ -1,6 +1,6 @@
 {
   "name": "@hxql/dsh-presentation-preset",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Agent preset \"presentation\" for DeepSeek Harness: the deck-authoring capability set, selectable from Settings → Agent preset and the new-session mode picker.",
   "type": "module",
   "license": "MIT",
@@ -36,5 +36,8 @@
     "dsh-plugin",
     "agent-preset",
     "presentation"
-  ]
+  ],
+  "dependencies": {
+    "@hxql/dsh-presentation": "^0.1.0"
+  }
 }

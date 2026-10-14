@@ -46,7 +46,7 @@ preset as well adds the picker entry.
 
 ## Install
 
-Two packages, and they are installed separately:
+Two packages. Installing the preset also installs the plugin, because the preset declares it as a dependency:
 
 | Package | What it gives you |
 |---|---|
@@ -257,7 +257,7 @@ Typst + Touying 编译成 PDF，并把页面**渲染回图片让 agent 亲眼看
 
 ## 安装
 
-两个包，**分别安装**：
+两个包。**装预设会连带装上插件** —— 预设把它声明为依赖：
 
 | 包 | 作用 |
 |---|---|
