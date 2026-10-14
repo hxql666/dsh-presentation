@@ -1,0 +1,120 @@
+# Agent preset "presentation": one `@deepseek-ai/dsh-agent-preset` declaration.
+#
+# A preset is the plugin set an Agent runs on, so this row is what puts a fifth
+# card in Settings → Agent preset and a fifth entry in the new-session mode
+# picker. It is deliberately the standard capability set with three changes:
+#
+#   * `dsh-presentation-v5` is added, which is what makes the deck tools exist.
+#   * The shell rows are dropped. Building a deck needs the workspace, not a
+#     terminal: the plugin resolves and runs the Typst compiler itself, so a
+#     shell would only widen the surface a presentation session has to reason
+#     about (and widen the prompt prefix with it).
+#   * Delegation is dropped for the same reason — a deck is authored here.
+#
+# Everything else matches `standard`, so files, search, skills, goals, todos,
+# web research, `present` and compaction all keep working.
+- insert:
+    - id: preset-presentation
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: presentation
+        order: 5
+        name: 演示模式
+        description: 以结构化数据驱动 Typst/Touying 生成 PDF 演示文稿，并渲染页面自审版式。
+        plugins:
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              suffix: Your working directory is {{cwd}}.
+              prefix: You are a presentation-document agent powered by the {{model}} model. The deliverable is a PDF deck, not code.
+          - id: agent-instructions
+            name: '@deepseek-ai/dsh-agent-instructions'
+            config:
+              maxBytes: 65536
+          - id: tool-fs
+            name: '@deepseek-ai/dsh-tool-fs'
+          - id: tool-fs-search
+            name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              sampleOverCapGlobResults: false
+          - id: tool-jobs
+            name: '@deepseek-ai/dsh-tool-jobs'
+          - id: skill-filesystem
+            name: '@deepseek-ai/dsh-skill-filesystem'
+          - id: tool-skill
+            name: '@deepseek-ai/dsh-tool-skill'
+          - id: command-goal
+            name: '@deepseek-ai/dsh-command-goal'
+          - id: tool-goal
+            name: '@deepseek-ai/dsh-tool-goal'
+          - id: planning
+            name: cordis:group
+            group: true
+            isolate:
+              planMode: true
+            config:
+              - id: plan-mode
+                name: '@deepseek-ai/dsh-plan-mode'
+                config:
+                  section: |
+                    You are in plan mode. Stay in plan mode until exit_plan_mode succeeds or the user switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement — including an answer confirming something you asked — approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
+
+                    For a deck, the plan is the argument: state the audience and what they must leave believing, then the page sequence and the one claim each page makes. Choose a layout per page from deck_status rather than forcing every page into bullets. Do not build the deck yet.
+
+                    When ready, call exit_plan_mode with the complete plan markdown, starting with a # title. Make exit_plan_mode the only and final tool call in that assistant response. If review rejects it, incorporate the feedback and present again.
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+              toolResultPruner: true
+            config:
+              - id: compaction-basic
+                name: '@deepseek-ai/dsh-compaction-basic'
+              - id: command-compact
+                name: '@deepseek-ai/dsh-command-compact'
+              - id: tool-result-pruner
+                name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+                config:
+                  thresholdChars: 8192
+                  headChars: 4096
+                  tailChars: 1024
+          - id: tool-ask-user
+            name: '@deepseek-ai/dsh-tool-ask-user'
+          - id: tool-todo
+            name: '@deepseek-ai/dsh-tool-todo'
+            config:
+              allowParallelInProgress: true
+          - id: tool-web
+            name: '@deepseek-ai/dsh-tool-web'
+            config:
+              fetch: true
+              searchTimeoutMs: 60000
+          - id: present
+            name: '@deepseek-ai/dsh-tool-present'
+          - id: presentation
+            name: '@hxql666/dsh-presentation'
+            config:
+              # `section` is required by the plugin and is the only place this
+              # guidance belongs: the plugin adds it to the request only while
+              # presentation-document mode is on, so it costs nothing otherwise.
+              section: |
+                You are in presentation-document mode. The deliverable is a PDF deck, not code.
+
+                Author decks as structured page data and compile them with deck_build. Never write Typst markup yourself: the layout engine owns all typesetting, so hand-written markup is ignored at best. Inline emphasis inside text slots is **bold** and *italic*; everything else renders literally.
+
+                Call deck_status first for the page layouts, their slots, the themes, and the scenes. Pass `scene` when the request is a known kind of talk (tech-talk, academic, teaching, product, review, pitch): a scene sets the theme, frame ratio, font stack, a usual page order, and the register the slides should read in. Choose a layout per page rather than forcing every page into bullets, and keep one idea per page.
+
+                Work in this order: plan the page sequence, build, then call deck_check and actually read the rendered page images back with the image-reading tool. Inspect them for overlapping text, content that overflows or is clipped, frames that are nearly empty or uncomfortably full, and wording that does not fit. Fix the spec and rebuild until the pages look right, then deliver.
+
+                Write for a room, not a reader: short lines, concrete nouns, no filler.
+              # Language facts for line breaking and punctuation; see the plugin README.
+              locale: zh
+              workdir: ''
+              timeoutMs: 180000
+              maxOutputBytes: 67108864
+              maxPages: 200
+              checkPpi: 110
+          - id: tool-plugin-manager
+            name: '@deepseek-ai/dsh-plugin-manager/tools'
+            disabled: true

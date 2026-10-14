@@ -1,0 +1,14 @@
+# Normalize line endings so a Windows checkout and a Linux checkout produce the
+# same bytes. Typst and Node read either, but a mixed tree makes diffs noisy.
+* text=auto eol=lf
+
+# Vendored third-party sources keep their upstream bytes exactly: rewriting line
+# endings inside a redistributed package would make it disagree with the copy it
+# is meant to be, and would obscure whether anything else was changed.
+packages/dsh-presentation/vendor/ -text
+
+# Binary assets are never line-ending converted.
+*.png binary
+*.jpg binary
+*.pdf binary
+*.exe binary

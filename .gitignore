@@ -1,0 +1,27 @@
+# Build and install output
+node_modules/
+.test-output/
+*.tsbuildinfo
+
+# Local deck builds: the plugin writes decks under the session workspace, and a
+# checkout should never carry one into a commit.
+deck/
+*.pdf
+*.pdfpc
+
+# Editor and OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local environment
+.env
+.env.*
+*.local
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*

@@ -1,0 +1,36 @@
+{
+  "name": "@hxql666/dsh-presentation",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Presentation-document mode for DeepSeek Harness: author Typst/Touying decks as structured data, compile to PDF with a visual self-review loop. · DSH 演示文档模式：以结构化数据驱动 Typst/Touying 生成 PDF 演示文稿。",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "optionalDependencies": {
+    "@flukxr/typst-cli-win32-x64": "0.15.1-npm.0",
+    "@flukxr/typst-cli-win32-arm64": "0.15.1-npm.0",
+    "@flukxr/typst-cli-linux-x64": "0.15.1-npm.0",
+    "@flukxr/typst-cli-linux-arm64": "0.15.1-npm.0",
+    "@flukxr/typst-cli-darwin-x64": "0.15.1-npm.0",
+    "@flukxr/typst-cli-darwin-arm64": "0.15.1-npm.0"
+  },
+  "files": [
+    "index.js",
+    "lib",
+    "templates",
+    "vendor",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}

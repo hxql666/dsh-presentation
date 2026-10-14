@@ -1,0 +1,23 @@
+{
+  "name": "dsh-presentation-repo",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Monorepo for the DSH presentation-document plugin and its Agent preset.",
+  "type": "module",
+  "license": "MIT",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "node packages/dsh-presentation/test/schema-gate.mjs && node packages/dsh-presentation/test/assemble-test.mjs && node packages/dsh-presentation/test/final-sweep.mjs && node packages/dsh-presentation/test/handout-test.mjs && node packages/dsh-presentation/test/locale-test.mjs && node packages/dsh-presentation/test/scene-test.mjs && node packages/dsh-presentation/test/scene-build-test.mjs && node packages/dsh-presentation/test/encoding-audit.mjs && node packages/dsh-presentation-preset/test/preset-validate.cjs",
+    "test:schema": "node packages/dsh-presentation/test/schema-gate.mjs",
+    "test:assemble": "node packages/dsh-presentation/test/assemble-test.mjs",
+    "test:sweep": "node packages/dsh-presentation/test/final-sweep.mjs",
+    "test:handout": "node packages/dsh-presentation/test/handout-test.mjs",
+    "test:locale": "node packages/dsh-presentation/test/locale-test.mjs",
+    "test:preset": "node packages/dsh-presentation-preset/test/preset-validate.cjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
