@@ -39,6 +39,21 @@
 
 // --- text runs -------------------------------------------------------------
 
+/// The page's title, drawn in the body.
+///
+/// Not passed to `slide(title: …)`: that parameter exists on two of the seven
+/// themes, and the other five abort on the unexpected argument. Not a heading
+/// either: Touying consumes a heading as the slide title and prints it in the
+/// theme header, so it leaves the body and the rest of the page is laid out
+/// without it. A plain content block needs no theme cooperation.
+#let deck-page-title(title) = {
+  if title != none and title != "" {
+    block(below: 0.7em)[
+      #text(size: 1.5em, weight: "bold", fill: _accent, title)
+    ]
+  }
+}
+
 /// A small eyebrow above a title.
 #let deck-kicker(label, accent: _accent) = text(
   size: 0.78em,

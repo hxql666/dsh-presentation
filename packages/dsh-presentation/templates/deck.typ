@@ -8,19 +8,33 @@
 #import "@preview/touying:0.8.0": *
 #import "layout.typ": *
 
-// Touying exposes each theme through its `themes` module, and the documented
-// access form is a path import (`import themes.metropolis: *`); a plain
-// `import themes: name` does not resolve. Every theme this plugin offers is
-// therefore pulled in with the documented form, which also brings the shared
-// theme helpers (`utils`, `components`) into scope. The imports are idempotent
-// even though each theme module re-imports `src/exports.typ` internally.
-#import themes.default: *
-#import themes.simple: *
-#import themes.metropolis: *
-#import themes.dewdrop: *
-#import themes.university: *
-#import themes.aqua: *
-#import themes.stargazer: *
+// Every theme this plugin offers is imported, because `dsh-themes` selects one
+// at runtime. Each import is *named*, and that is load-bearing.
+//
+// A glob import (`import themes.simple: *`) also brings in everything else the
+// theme module exports, and every theme exports a `slide` — its own wrapper
+// around Touying's. A glob import therefore lets the last theme imported replace
+// `slide` for the whole document, so `simple-theme` ended up calling stargazer's
+// `slide`, which reads a store key simple never sets:
+//
+//     @preview/touying:0.8.0/themes/stargazer.typ:100:36:
+//       error: dictionary does not contain key "align"
+//
+// That hit exactly the four themes imported before stargazer, which is why
+// simple, dewdrop, aqua and default were the broken ones. Naming the one
+// function each import actually needs leaves Touying's `slide` the only `slide`
+// in scope.
+//
+// Only the theme functions are needed: `dsh-themes` looks one up by key, the
+// shared helpers arrive with `import "@preview/touying:0.8.0": *`, and the pages
+// themselves are built by `layout.typ`.
+#import themes.default: default-theme
+#import themes.simple: simple-theme
+#import themes.metropolis: metropolis-theme
+#import themes.dewdrop: dewdrop-theme
+#import themes.university: university-theme
+#import themes.aqua: aqua-theme
+#import themes.stargazer: stargazer-theme
 
 #let dsh-themes = (
   metropolis: metropolis-theme,
@@ -96,21 +110,21 @@
       ]
     ]
   } else if layout == "agenda" {
-    slide(title: title, composer: deck-composer)[
+    slide(composer: deck-composer)[#deck-page-title(title)
       #deck-bullets(dsh-list(spec.at("items", default: ())), gap: 0.75em)
     ]
   } else if layout == "quote" {
-    slide(title: title, composer: deck-composer)[
+    slide(composer: deck-composer)[#deck-page-title(title)
       #deck-quote(spec.at("quote", default: ""), author: spec.at("author", default: none))
     ]
   } else if layout == "kpis" {
-    slide(title: title, composer: deck-composer)[
+    slide(composer: deck-composer)[#deck-page-title(title)
       #if lead != none { deck-lead(lead) }
       #deck-kpis(spec.at("items", default: ()))
       #if takeaway != none { deck-takeaway(takeaway) }
     ]
   } else if layout == "timeline" {
-    slide(title: title, composer: deck-composer)[
+    slide(composer: deck-composer)[#deck-page-title(title)
       #if lead != none { deck-lead(lead) }
       #deck-timeline(spec.at("items", default: ()))
       #if takeaway != none { deck-takeaway(takeaway) }
@@ -118,18 +132,18 @@
   } else if layout == "cards" {
     let cards = spec.at("cards", default: ())
     let per-row = if cards.len() > 0 { cards.first().at("per-row", default: 2) } else { 2 }
-    slide(title: title, composer: deck-composer)[
+    slide(composer: deck-composer)[#deck-page-title(title)
       #if lead != none { deck-lead(lead) }
       #deck-cards(cards, per-row: per-row)
       #if takeaway != none { deck-takeaway(takeaway) }
     ]  } else if layout == "steps" {
-    slide(title: title, composer: deck-composer)[
+    slide(composer: deck-composer)[#deck-page-title(title)
       #if lead != none { deck-lead(lead) }
       #deck-steps(dsh-list(spec.at("items", default: ())))
       #if takeaway != none { deck-takeaway(takeaway) }
     ]
   } else if layout == "compare" {
-    slide(title: title, composer: deck-composer)[
+    slide(composer: deck-composer)[#deck-page-title(title)
       #deck-compare(
         deck-lines(spec.at("left", default: ())),
         deck-lines(spec.at("right", default: ())),
@@ -138,19 +152,19 @@
       )
     ]
   } else if layout == "table" {
-    slide(title: title, composer: deck-composer)[
+    slide(composer: deck-composer)[#deck-page-title(title)
       #if lead != none { deck-lead(lead) }
       #deck-table(spec.at("headers", default: ()), spec.at("rows", default: ()))
       #if takeaway != none { deck-takeaway(takeaway) }
     ]
   } else if layout == "code" {
-    slide(title: title, composer: deck-composer)[
+    slide(composer: deck-composer)[#deck-page-title(title)
       #if lead != none { deck-lead(lead) }
       #deck-code(spec.at("source", default: ""), language: spec.at("language", default: "typ"))
       #if takeaway != none { deck-takeaway(takeaway) }
     ]
   } else if layout == "image-text" {
-    slide(title: title, composer: deck-composer)[
+    slide(composer: deck-composer)[#deck-page-title(title)
       #deck-image-text(
         {
           if lead != none { deck-lead(lead) }
@@ -161,7 +175,7 @@
       )
     ]
   } else if layout == "columns" {
-    slide(title: title, composer: deck-composer)[
+    slide(composer: deck-composer)[#deck-page-title(title)
       #if lead != none { deck-lead(lead) }
       #grid(
         columns: spec.at("ratios", default: (1fr, 1fr)),
@@ -172,7 +186,7 @@
   } else {
     // "bullets" and any unmodelled layout degrade to a bullet page instead of
     // failing the whole compilation.
-    slide(title: title, composer: deck-composer)[
+    slide(composer: deck-composer)[#deck-page-title(title)
       #if lead != none { deck-lead(lead) }
       #deck-bullets(dsh-list(spec.at("items", default: ())))
       #if takeaway != none { deck-takeaway(takeaway) }
