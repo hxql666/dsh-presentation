@@ -72,9 +72,45 @@ const partial = await renderDeckPages({ typFile: small.typFile, buildDir, output
 const afterPartial = fs.readdirSync(previewDir).filter((n) => n.endsWith('.png')).sort()
 console.log(`  files on disk : ${afterPartial.join(', ') || '(none)'}`)
 console.log(`  reported      : ${partial.files.map((f) => path.basename(f)).join(', ') || '(none)'}`)
-check('the partial render reported exactly 2 files', partial.files.length === 2, String(partial.files.length))
+check('a partial render must not claim the pages it did not draw', partial.files.length === 2, String(partial.files.length))
 check('the reported pages are 1 and 2', partial.files.every((file) => /page-[12]\.png$/.test(file)))
 check('no stale page 3 or 4 is claimed', partial.files.every((file) => !/page-[34]\.png$/.test(file)))
+
+console.log('')
+console.log('=== cleanup removes only what this renderer wrote ===')
+{
+  // The first implementation deleted every file matching a `page*.png` prefix. That
+  // is too broad: a user's own `page-numbers.png` matches, and a file the renderer
+  // did not create is not its to remove. What is deleted now comes from a manifest of
+  // the previous render, so a name pattern can never reach a file this plugin did not
+  // write.
+  const guardDir = path.join(WORK, 'guard')
+  const guardPreview = path.join(guardDir, 'preview')
+  fs.mkdirSync(guardPreview, { recursive: true })
+  const guardSpec = { title: 'guard', locale: 'zh', slides: [{ layout: 'cover' }, { layout: 'bullets', lead: 'x', items: [{ text: 'a' }] }] }
+  const guardBuilt = await buildDeckPdf({ spec: guardSpec, buildDir: guardDir, outFile: path.join(guardDir, 'deck.pdf') })
+
+  const userFiles = ['page-numbers.png', 'page-mine.png', 'page-1.png.bak']
+  for (const name of userFiles) fs.writeFileSync(path.join(guardPreview, name), 'a file the user put here')
+
+  await renderDeckPages({ typFile: guardBuilt.typFile, buildDir: guardDir, outputPattern: path.join(guardPreview, 'page-{p}.png'), ppi: 40 })
+  const manifest = fs.readdirSync(guardPreview).find((name) => name.endsWith('.manifest.json'))
+  check('a manifest records the render', manifest !== undefined, String(manifest))
+
+  // Shrink the deck so pages 2+ become stale, then render again.
+  const smallSpec = { title: 'guard', locale: 'zh', slides: [{ layout: 'cover' }] }
+  const smallBuilt = await buildDeckPdf({ spec: smallSpec, buildDir: guardDir, outFile: path.join(guardDir, 'deck.pdf') })
+  const second = await renderDeckPages({ typFile: smallBuilt.typFile, buildDir: guardDir, outputPattern: path.join(guardPreview, 'page-{p}.png'), ppi: 40 })
+
+  const left = fs.readdirSync(guardPreview).sort()
+  console.log(`  directory now : ${left.join(', ')}`)
+  check('the stale page is gone', !left.includes('page-2.png'))
+  check('the requested page is there', left.includes('page-1.png'))
+  check('the manifest itself is not reported as a page', second.files.every((file) => file.endsWith('page-1.png')), String(second.files.length))
+  for (const name of userFiles) {
+    check(`the user's ${name} was not removed`, left.includes(name))
+  }
+}
 
 console.log('')
 console.log(failures === 0 ? 'STALE-PREVIEW FIX VERIFIED' : `${failures} check(s) failed`)

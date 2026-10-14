@@ -15,6 +15,7 @@
  *
  * @module @hxql/dsh-presentation/tools
  */
+import fs from 'node:fs'
 import path from 'node:path'
 import { buildDeckPdf, compileDocumentPdf, prepareDeck, renderDeckPages, writePdfpc } from './build.js'
 import { EngineError, REQUIRED_TYPST, VENDORED_TOUYING, resolveBinary } from './engine.js'
@@ -189,6 +190,51 @@ export function deckDir(exec, configuredDir) {
     return path.isAbsolute(configuredDir) ? configuredDir : path.join(sessionCwd(exec), configuredDir)
   }
   return path.join(sessionCwd(exec), DECK_DIR)
+}
+
+/**
+ * The real path of a directory, resolving links, tolerating a path that is not there.
+ *
+ * @param {string} target
+ * @returns {string} A real path when the target exists, its normalised form otherwise.
+ */
+function realPathOf(target) {
+  try {
+    return fs.realpathSync.native(target)
+  } catch {
+    return path.resolve(target)
+  }
+}
+
+/**
+ * The real path a possibly-not-yet-existing path will have, resolving links above it.
+ *
+ * `realpath` needs the whole path to exist, and an output directory usually does not
+ * yet. So the nearest existing ancestor is resolved — which is where a link would be —
+ * and the remaining segments are appended. Case is preserved as given for the segments
+ * that do not exist yet, since only the resolved part is compared.
+ *
+ * @param {string} target An absolute path.
+ * @returns {string}
+ */
+function realPathThrough(target) {
+  const absolute = path.resolve(target)
+  const missing = []
+  let current = absolute
+
+  for (;;) {
+    try {
+      const resolved = fs.realpathSync.native(current)
+      // `path.join` normalises the separators of the appended segments.
+      return missing.length === 0 ? resolved : path.join(resolved, ...missing.reverse())
+    } catch {
+      const parent = path.dirname(current)
+      // A filesystem root has no parent; stop rather than loop.
+      if (parent === current) return absolute
+      missing.push(path.basename(current))
+      current = parent
+    }
+  }
 }
 
 /**
@@ -567,6 +613,28 @@ function buildToolDefinitions(config) {
           throw new EngineError(
             'bad-outdir',
             `outDir must stay inside the deck directory (${dir}); ${JSON.stringify(requestedDir)} resolves outside it`,
+          )
+        }
+
+        // A string check is not enough on its own: a symlink or junction *inside* the
+        // deck directory has a name that passes it while the filesystem sends the
+        // write elsewhere. Measured rather than assumed — writing through such a link
+        // succeeded with exit 0 and the file landed outside the tree, while reading
+        // through one is refused by Typst's `--root`. Writes are the open direction,
+        // which is why this second check exists (see `test/escape-vectors-test.mjs`).
+        //
+        // The comparison is on real paths. The target may not exist yet, so the
+        // nearest existing ancestor is resolved and the remaining segments appended —
+        // a legitimate new directory still works, while a link anywhere above it is
+        // caught.
+        const realDeck = realPathOf(dir)
+        const realTarget = realPathThrough(resolved)
+        const realRelative = path.relative(realDeck, realTarget)
+        if (realRelative.startsWith('..') || path.isAbsolute(realRelative)) {
+          throw new EngineError(
+            'bad-outdir',
+            `outDir must stay inside the deck directory (${dir}); ${JSON.stringify(requestedDir)} ` +
+            `resolves to ${realTarget}, which is outside it`,
           )
         }
         previewDir = resolved

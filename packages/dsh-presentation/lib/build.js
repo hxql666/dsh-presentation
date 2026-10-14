@@ -219,26 +219,50 @@ export async function renderDeckPages({ typFile, buildDir, outputPattern, ppi = 
   const dir = path.dirname(outputPattern.replace('{p}', '1'))
   ensureDir(dir)
 
-  // Remove this pattern's previous output first.
+  // Remove the pages this pattern wrote last time, before writing them again.
   //
   // Typst overwrites the pages it renders and leaves every other file alone, so a
   // later render of fewer pages — a deck edited down from 16 frames to 7, or a
-  // render of just pages 1-5 — used to leave the older images sitting beside the
-  // new ones. The visual self-review step then reads them: it inspects pages that
-  // are not in the current deck, and can "fix" a problem the deck no longer has.
-  // Only files matching this pattern are touched, so a neighbouring directory or
-  // an unrelated image is safe.
-  const stem = path.basename(outputPattern).replace('{p}', '')
-  const prefix = stem.endsWith('.png') ? stem.slice(0, -4) : stem
-  const stale = fs.existsSync(dir)
-    ? fs.readdirSync(dir).filter((name) => name.startsWith(prefix) && name.endsWith('.png'))
-    : []
-  for (const name of stale) {
+  // render of just pages 1-5 — used to leave the older images sitting beside the new
+  // ones. The visual self-review step then reads them: it inspects pages that are
+  // not in the current deck, and can "fix" a problem the deck no longer has.
+  //
+  // What is deleted is taken from a manifest of the previous render rather than from
+  // a name pattern. Pattern matching was the first implementation and it was too
+  // broad: `page-numbers.png` in the output directory matches a `page*.png` prefix,
+  // and a user's file is not ours to remove. The manifest means only files this
+  // renderer produced are ever deleted, and the pattern only decides where to look.
+  // A directory that has never been rendered into has no manifest, so nothing is
+  // removed from it at all.
+  // The manifest is named after the pattern's stem, so two different preview
+  // directories or two different patterns each keep their own record. The placeholder
+  // and then the extension are stripped in that order — doing it the other way round
+  // leaves the extension in the name, which reads as `page-.png.manifest.json`.
+  const stem = path.basename(outputPattern)
+    .replace('{p}', '')
+    .replace(/\.(png|pdf|svg)$/i, '')
+    .replace(/[-_.]+$/, '')
+  const manifestFile = path.join(dir, `${stem === '' ? 'render' : stem}.manifest.json`)
+  const previous = []
+  try {
+    if (fs.existsSync(manifestFile)) {
+      const parsed = JSON.parse(fs.readFileSync(manifestFile, 'utf8'))
+      if (Array.isArray(parsed?.files)) {
+        for (const name of parsed.files) {
+          // A manifest is a file on disk, so it is treated as untrusted: only a
+          // plain file name in this directory is acted on, never a path.
+          if (typeof name === 'string' && name !== '' && path.basename(name) === name) previous.push(name)
+        }
+      }
+    }
+  } catch {
+    // An unreadable manifest means nothing is cleaned, which is the safe direction.
+  }
+  for (const name of previous) {
     try {
       fs.rmSync(path.join(dir, name), { force: true })
     } catch {
-      // A locked file is not worth failing the render over; the count below will
-      // still report only the pages that were asked for.
+      // A locked file is not worth failing the render over.
     }
   }
 
@@ -288,6 +312,18 @@ export async function renderDeckPages({ typFile, buildDir, outputPattern, ppi = 
       numbered.push({ page, file })
     }
   }
+  // Record what was written, so the next render knows exactly what is its own.
+  //
+  // Readable page numbers are stored rather than file names alone: a partial render
+  // of pages 1-2 followed by a full render must clean up both, and the union of the
+  // two is what the next render has to remove.
+  const written = new Set([...previous, ...numbered.map((entry) => path.basename(entry.file))])
+  try {
+    fs.writeFileSync(manifestFile, `${JSON.stringify({ pattern: path.basename(outputPattern), files: [...written].sort() }, null, 2)}\n`, 'utf8')
+  } catch {
+    // Without a manifest the next render simply cleans nothing, which is safe.
+  }
+
   return { files: numbered.map((entry) => entry.file), pages: numbered, diagnostics, stderr: result.stderr.slice(-8000) }
 }
 

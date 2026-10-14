@@ -1,0 +1,96 @@
+# Run the suite on every push and pull request.
+#
+# Separate from `publish.yml`, which also runs the suite but only when a release is
+# meant to go out. This one is the signal on ordinary changes — a red badge on the
+# README, so a contributor can see whether their branch is healthy without asking.
+#
+# Three platforms on purpose. The plugin ships six platform-specific Typst binaries
+# and resolves paths, junctions and case sensitivity differently per OS; Windows is
+# where this was developed and Linux is where it publishes, so testing only one of
+# them would leave the other unexercised. macOS is included because it is the third
+# platform the package declares binaries for.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      # A failure on one platform should not hide the result on the others.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Root install brings the toolchain (TypeScript, Node types). The package's
+      # own install fetches the Typst binary for this platform — an optional
+      # dependency, so a platform without a published binary would silently skip it
+      # and the suite would fail on the first build rather than at install.
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      - name: Show which Typst the suite will use
+        shell: bash
+        run: |
+          node -e "
+          const path = require('path');
+          const fs = require('fs');
+          const dir = 'packages/dsh-presentation/node_modules/@flukxr';
+          if (!fs.existsSync(dir)) { console.log('no @flukxr packages installed'); process.exit(0); }
+          for (const name of fs.readdirSync(dir)) {
+            const exe = path.join(dir, name, 'vendor', process.platform === 'win32' ? 'typst.exe' : 'typst');
+            console.log(name, fs.existsSync(exe) ? 'binary present' : 'no binary');
+          }
+          "
+
+      - name: Test
+        run: npm test
+
+  # The published artifact is what a stranger installs, so it gets its own check:
+  # the tarball must contain the vendored Typst package and nothing that should not
+  # ship.
+  artifact:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      - name: Pack and inspect
+        shell: bash
+        run: |
+          mkdir -p /tmp/pack
+          npm pack --workspace=@hxql/dsh-presentation --pack-destination /tmp/pack
+          ls -la /tmp/pack
+          tarball=$(ls /tmp/pack/*.tgz)
+
+          echo '--- the vendored Touying package must be inside ---'
+          tar -tzf "$tarball" | grep -c vendor/preview/touying/0.8.0/lib.typ
+
+          echo '--- the browser preset patch must be inside ---'
+          tar -tzf "$tarball" | grep -c cordis.patch.yml
+
+          echo '--- nothing forbidden ---'
+          if tar -tzf "$tarball" | grep -E 'node_modules/|\.test-output|\.pdf$|\.log$|\.tgz$'; then
+            echo 'a forbidden path is in the tarball'
+            exit 1
+          fi
+          echo 'clean'

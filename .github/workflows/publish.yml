@@ -1,4 +1,4 @@
-# Publish both packages to npm from CI, with no stored token and no one-time code.
+# Publish to npm from CI, with no stored token and no one-time code.
 #
 # Why this exists rather than `npm publish` on a laptop:
 #
@@ -14,18 +14,23 @@
 #
 # One-time setup before this can work:
 #
-#   1. Publish each package once interactively so it exists — npm only lets you
+#   1. Publish the package once interactively so it exists — npm only lets you
 #      register a trusted publisher for a package that already exists. Use an
 #      authenticator app, or `npm stage publish` followed by an approval.
-#   2. On npmjs.com, for EACH of the two packages: Settings -> Trusted Publisher
+#   2. On npmjs.com, for @hxql/dsh-presentation: Settings -> Trusted Publisher
 #      -> GitHub Actions, and enter
 #          Organization or user: hxql666
 #          Repository:          dsh-presentation
 #          Workflow filename:   publish.yml
 #          Environment:         (leave blank)
 #
-# After that, run this workflow (Actions -> Publish to npm -> Run workflow) and
-# both packages go out with provenance.
+# After that, run this workflow (Actions -> Publish to npm -> Run workflow) and the
+# package goes out with provenance.
+#
+# There is one package. An earlier release had two — a plugin and a separate preset
+# package — and this workflow still packed and published both after they were merged,
+# which would have failed on the second publish. Keep the release steps and the
+# workspace list in step.
 name: Publish to npm
 
 on:
@@ -57,36 +62,39 @@ jobs:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
 
-      # The plugin declares its Typst binaries as optional platform
-      # dependencies. They are needed only to run the suite below, and CI is
-      # Linux x64, so exactly one is fetched.
+      # The plugin declares its Typst binaries as optional platform dependencies.
+      # They are needed only to run the suite below, and CI is Linux x64, so exactly
+      # one is fetched.
       - name: Install
         run: npm install --no-audit --no-fund
 
-      # The suite opens with the type check, so a mistake in our own code or in
-      # a JSDoc contract stops the release here.
+      # The suite opens with the type check, so a mistake in our own code or in a
+      # JSDoc contract stops the release here.
       - name: Test
         run: npm test
 
-      - name: Pack both packages and show what would ship
+      - name: Pack and show what would ship
+        shell: bash
         run: |
           mkdir -p /tmp/pack
           npm pack --workspace=@hxql/dsh-presentation --pack-destination /tmp/pack
-          npm pack --workspace=@hxql/dsh-presentation-preset --pack-destination /tmp/pack
-          echo '--- tarballs ---'
+          echo '--- tarball ---'
           ls -la /tmp/pack
-          echo '--- plugin contents (proof the vendored Typst package is present) ---'
-          tar -tzf /tmp/pack/hxql-dsh-presentation-*.tgz | grep -c vendor/preview/touying
-          echo '--- nothing forbidden in either tarball ---'
-          ! (tar -tzf /tmp/pack/*.tgz | grep -E 'node_modules/|\.test-output|\.pdf$|\.log$')
+          tarball=$(ls /tmp/pack/*.tgz)
+          echo '--- the vendored Typst package is present ---'
+          tar -tzf "$tarball" | grep -c vendor/preview/touying/0.8.0/lib.typ
+          echo '--- the preset patch is present ---'
+          tar -tzf "$tarball" | grep -c cordis.patch.yml
+          echo '--- nothing forbidden ---'
+          if tar -tzf "$tarball" | grep -E 'node_modules/|\.test-output|\.pdf$|\.log$|\.tgz$'; then
+            echo 'a forbidden path is in the tarball'
+            exit 1
+          fi
+          echo 'clean'
 
-      # No NODE_AUTH_TOKEN: the OIDC exchange authenticates the publish. npm
-      # reads the id-token permission above and the trusted-publisher
-      # registration on the package itself.
+      # No NODE_AUTH_TOKEN: the OIDC exchange authenticates the publish. npm reads
+      # the id-token permission above and the trusted-publisher registration on the
+      # package itself.
       - name: Publish @hxql/dsh-presentation
         if: ${{ inputs.dry-run != true }}
         run: npm publish --workspace=@hxql/dsh-presentation --access public --provenance
-
-      - name: Publish @hxql/dsh-presentation-preset
-        if: ${{ inputs.dry-run != true }}
-        run: npm publish --workspace=@hxql/dsh-presentation-preset --access public --provenance
