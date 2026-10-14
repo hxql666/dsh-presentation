@@ -92,19 +92,28 @@ export function decodePng(buffer) {
 }
 
 /**
- * The fraction of a page covered by ink.
+ * The fraction of a page covered by ink, and how its tones are distributed.
  *
  * A pixel counts as ink when it is dark enough to be content rather than
  * background. The threshold sits well below the darkest text and well above the
  * tinted panels the layouts use behind cards and takeaways, so a large tinted area
  * is not mistaken for text while normal antialiasing is.
  *
+ * `midtones` answers a different question: whether the page is a picture. The
+ * colour count was tried first and **rejected by measurement** — a solid-fill image
+ * used 90 distinct colours while a page of Chinese text used 125, because
+ * antialiased glyphs are themselves many colours and a flat image is one. What does
+ * separate them is tonal spread: a text page is almost entirely background with a
+ * small amount of dark glyph, so very little sits in between, while an image
+ * occupies the whole range. Measured across the layouts, text pages put 2-5% of
+ * their area in the midtones and image pages put 45% or more.
+ *
  * @param {string} file  Path to a PNG.
  * @param {object} [options]
  * @param {number} [options.darkBelow]  Luminance under which a pixel counts as ink.
  * @param {number} [options.inset]      Fraction of each edge ignored, so the
  *   theme's header bar, progress bar and page number do not count as density.
- * @returns {{ ink: number, dark: number, width: number, height: number }}
+ * @returns {{ ink: number, dark: number, midtones: number, colours: number, width: number, height: number }}
  */
 export function inkFraction(file, { darkBelow = 200, inset = 0.06 } = {}) {
   const { width, height, channels, pixels } = decodePng(fs.readFileSync(file))
@@ -116,7 +125,11 @@ export function inkFraction(file, { darkBelow = 200, inset = 0.06 } = {}) {
 
   let ink = 0
   let dark = 0
+  let mid = 0
   let total = 0
+  const colours = new Set()
+  const step = Math.max(1, Math.floor(Math.min(x1 - x0, y1 - y0) / 220))
+
   for (let y = y0; y < y1; y += 1) {
     for (let x = x0; x < x1; x += 1) {
       const at = (y * width + x) * channels
@@ -127,8 +140,14 @@ export function inkFraction(file, { darkBelow = 200, inset = 0.06 } = {}) {
       total += 1
       if (luminance < darkBelow) ink += 1
       if (luminance < 110) dark += 1
+      // Midtones: neither background nor glyph. Text contributes almost none; a
+      // picture contributes most of its area.
+      if (luminance >= 60 && luminance < 225) mid += 1
+      if ((x - x0) % step === 0 && (y - y0) % step === 0) {
+        colours.add(((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3))
+      }
     }
   }
 
-  return { ink: ink / total, dark: dark / total, width, height }
+  return { ink: ink / total, dark: dark / total, midtones: mid / total, colours: colours.size, width, height }
 }

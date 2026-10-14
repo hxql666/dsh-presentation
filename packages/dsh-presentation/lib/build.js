@@ -208,7 +208,10 @@ export async function buildDeckPdf({ spec, buildDir, outFile, typstBinary, typst
  * @param {string} [options.typstBinary]  Explicit compiler path.
  * @param {string} [options.typstPath]    Which Typst to prefer: auto, system, or bundled.
  * @param {number} [options.timeoutMs]
- * @returns {Promise<{ files: string[], diagnostics: object[], stderr: string }>}   `stderr` is the tail the model needs when a page fails to render.
+ * @returns {Promise<{ files: string[], pages: { page: number, file: string }[], diagnostics: object[], stderr: string }>}
+ *   `pages` carries each rendered page's number beside its path, so a caller can
+ *   relate a page back to the frame it came from. `stderr` is the tail the model
+ *   needs when a page fails to render.
  */
 export async function renderDeckPages({ typFile, buildDir, outputPattern, ppi = 110, pages, typstBinary, typstPath, timeoutMs = 180000 }) {
   const binary = resolveBinary({ configured: typstBinary, preferSystem: typstPath === 'system' })
@@ -257,27 +260,35 @@ export async function renderDeckPages({ typFile, buildDir, outputPattern, ppi = 
   }
   const diagnostics = parseDiagnostics(result.stderr)
   if (result.code !== 0) {
-    return { files: [], diagnostics, stderr: result.stderr.slice(-8000) }
+    return { files: [], pages: [], diagnostics, stderr: result.stderr.slice(-8000) }
   }
 
   // Report exactly the requested pages that now exist on disk, rather than every
   // PNG in the directory. Asking for pages 1-5 must not claim pages 6-8 exist.
+  //
+  // The page numbers are carried alongside the paths because a caller often needs
+  // to know which frame a page came from — the density check exempts picture pages,
+  // and it must know which pages those are from the render itself. Reading a spec
+  // file instead was wrong: the file is overwritten by the next build, so a caller
+  // that built a ten-page deck, built a smaller one, and then reviewed the first
+  // would look up frames in the wrong spec. `--pages` maps every page to one frame,
+  // so a page number is always a frame index plus one.
   const wanted = Array.isArray(pages) && pages.length > 0 ? pages : undefined
-  const files = []
+  const numbered = []
   if (wanted !== undefined) {
     for (const page of wanted) {
       const file = outputPattern.replace('{p}', String(page))
-      if (fs.existsSync(file)) files.push(file)
+      if (fs.existsSync(file)) numbered.push({ page, file })
     }
   } else {
     // No explicit range: take the contiguous run Typst produced, starting at 1.
     for (let page = 1; ; page += 1) {
       const file = outputPattern.replace('{p}', String(page))
       if (!fs.existsSync(file)) break
-      files.push(file)
+      numbered.push({ page, file })
     }
   }
-  return { files, diagnostics, stderr: result.stderr.slice(-8000) }
+  return { files: numbered.map((entry) => entry.file), pages: numbered, diagnostics, stderr: result.stderr.slice(-8000) }
 }
 
 /**

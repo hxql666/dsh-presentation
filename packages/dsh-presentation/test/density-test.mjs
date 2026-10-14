@@ -124,9 +124,80 @@ console.log('=== a sparse deck stays silent ===')
 {
   await build.execute({ spec: { title: 'sparse', locale: 'zh', slides: [{ layout: 'cover' }, { layout: 'quote', quote: '一句话。' }] } }, exec)
   const result = await check.execute({}, exec)
-  const rendered = check.output.render({}, result)
-  const body = typeof rendered === 'string' ? rendered : String(rendered?.text ?? '')
+  const body = renderedText(check, result)
   ok('no warning is emitted', !body.includes('WARNING'))
+}
+
+console.log('')
+console.log('=== a picture page is exempt, because its ink is the picture ===')
+{
+  // A full-width image covers most of the page by design, so it measures as dense as
+  // an overfull text page — 56.6% against a 19% threshold — and the warning would be
+  // simply wrong. Getting this right is why the measurement also reports tonal
+  // spread: a text page puts 2-8% of its area in the midtones, a picture page 54% or
+  // more. The colour count does not work for this, which was measured rather than
+  // assumed: a solid-fill image used 90 colours while a page of Chinese text used
+  // 125, because antialiased glyphs are many colours and a flat image is one.
+  const deckDir = WORK
+  fs.mkdirSync(path.join(deckDir, 'build'), { recursive: true })
+  const zlib = await import('node:zlib')
+  const width = 64
+  const height = 64
+  const raw = Buffer.alloc((width * 3 + 1) * height)
+  for (let y = 0; y < height; y += 1) {
+    const row = y * (width * 3 + 1)
+    for (let x = 0; x < width; x += 1) {
+      raw[row + 1 + x * 3] = Math.floor((x / width) * 255)
+      raw[row + 2 + x * 3] = 255 - Math.floor((x / width) * 255)
+      raw[row + 3 + x * 3] = Math.floor((y / height) * 255)
+    }
+  }
+  let crcTable = null
+  const crcOf = (buf) => {
+    if (crcTable === null) {
+      crcTable = new Int32Array(256)
+      for (let n = 0; n < 256; n += 1) {
+        let c = n
+        for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
+        crcTable[n] = c
+      }
+    }
+    let crc = -1
+    for (const byte of buf) crc = (crc >>> 8) ^ crcTable[(crc ^ byte) & 0xff]
+    return (crc ^ -1) >>> 0
+  }
+  const chunk = (type, data) => {
+    const length = Buffer.alloc(4)
+    length.writeUInt32BE(data.length)
+    const body = Buffer.concat([Buffer.from(type, 'latin1'), data])
+    const crc = Buffer.alloc(4)
+    crc.writeUInt32BE(crcOf(body))
+    return Buffer.concat([length, body, crc])
+  }
+  const ihdr = Buffer.alloc(13)
+  ihdr.writeUInt32BE(width, 0)
+  ihdr.writeUInt32BE(height, 4)
+  ihdr[8] = 8
+  ihdr[9] = 2
+  fs.writeFileSync(path.join(deckDir, 'build', 'gradient.png'), Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', zlib.deflateSync(raw)),
+    chunk('IEND', Buffer.alloc(0)),
+  ]))
+
+  const built = await build.execute(
+    { spec: { title: 'picture', locale: 'zh', slides: [{ layout: 'cover' }, { layout: 'image', title: '一张渐变色图', image: 'gradient.png' }] } },
+    exec,
+  )
+  ok('the picture page builds', built?.ok === true, String(built?.message ?? '').slice(0, 80))
+
+  const result = await check.execute({ ppi: 72 }, exec)
+  const page = (result.density ?? []).find((entry) => entry.page === 'page-2.png')
+  ok('its density is above the threshold', (page?.ink ?? 0) >= 0.19, String(page?.ink))
+  ok('it is recognised as a picture', page?.picture === true, JSON.stringify(page))
+  ok('it is not reported as too dense', (result.tooDense ?? []).length === 0, JSON.stringify(result.tooDense ?? null))
+  ok('no warning reaches the model', !renderedText(check, result).includes('WARNING'))
 }
 
 console.log('')

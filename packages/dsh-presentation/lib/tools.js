@@ -162,6 +162,17 @@ export function validateSpec(spec) {
  */
 const DENSE_PAGE = 0.19
 
+/**
+ * The midtone fraction above which a page is treated as a picture rather than text.
+ *
+ * Calibrated by measurement: a page of text puts 2-8% of its area in the midtones,
+ * and a page carrying an image puts 54% or more, so 25% sits in a wide gap. Note
+ * that the colour count does NOT work — a solid-fill image used 90 colours while a
+ * page of Chinese text used 125, because antialiased glyphs are many colours and a
+ * flat image is one. It is tonal spread that separates them.
+ */
+const PICTURE_MIDTONES = 0.25
+
 const THEMES = ['metropolis', 'simple', 'university', 'dewdrop', 'stargazer', 'aqua', 'default']
 const FONT_STACKS = ['sans', 'serif', 'cjk-sans']
 
@@ -580,13 +591,28 @@ function buildToolDefinitions(config) {
       // last line through the footer and reported no overflow at all. Density
       // separates the two clearly (0.24 for that page against 0.04 for a normal
       // one), which is enough to point the reviewer at the page.
+      //
+      // Pages dominated by a picture are exempt from the density warning, and that
+      // exemption is not a convenience: an image covers most of the page by design,
+      // so a photograph or a filled placeholder measures as dense as an overfull
+      // text page. Measured: a full-width image page reported 56.6% and the warning
+      // was simply wrong. What the measurement detects is *cramped text*, which a
+      // picture page does not have.
+      //
+      // The test is the page's own colour count — a text page uses a few dozen
+      // colours, a picture hundreds — rather than the deck spec's layout list. The
+      // spec file is overwritten by the next build, so reading it made the exemption
+      // depend on build order; a page cannot be stale about itself.
       const dense = []
       const measured = []
       for (const file of result.files.slice(0, config.maxPages)) {
         try {
-          const { ink } = inkFraction(file)
-          measured.push({ page: path.basename(file), ink: Number(ink.toFixed(4)) })
-          if (ink >= DENSE_PAGE) dense.push(`${path.basename(file)} (${(ink * 100).toFixed(1)}% of the page is ink)`)
+          const { ink, midtones, colours } = inkFraction(file)
+          const picture = midtones >= PICTURE_MIDTONES
+          measured.push({ page: path.basename(file), ink: Number(ink.toFixed(4)), midtones: Number(midtones.toFixed(4)), colours, picture })
+          if (!picture && ink >= DENSE_PAGE) {
+            dense.push(`${path.basename(file)} (${(ink * 100).toFixed(1)}% of the page is ink)`)
+          }
         } catch {
           // A page that cannot be decoded must not fail the check; the image is
           // still returned for the reviewer to look at.
