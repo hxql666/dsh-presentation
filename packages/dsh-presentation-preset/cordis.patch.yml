@@ -93,6 +93,11 @@
           - id: present
             name: '@deepseek-ai/dsh-tool-present'
           - id: presentation
+            # This name must match how the plugin is installed. A local install
+            # uses a versioned identity (`dsh-presentation-v6`) because the host
+            # caches an ESM module by resolved URL, so editing an already-imported
+            # path is never re-read; change this value with the installed
+            # identity. Installing the published package uses the name above.
             name: '@hxql/dsh-presentation'
             config:
               # `section` is required by the plugin and is the only place this
