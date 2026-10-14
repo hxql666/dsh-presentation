@@ -22,7 +22,11 @@ function check(label, condition, detail = '') {
 }
 
 console.log('=== the copies match the originals ===')
-const COPIED = ['LICENSE', 'THIRD-PARTY-NOTICES.md']
+// `README_EN.md` is in this list for the same reason as the licenses: `files` in
+// package.json resolves against the package directory, and an entry that matches
+// nothing there is skipped **silently**. Measured — the tarball shipped `README.md`
+// and no `README_EN.md` until a copy existed beside it.
+const COPIED = ['LICENSE', 'THIRD-PARTY-NOTICES.md', 'README_EN.md']
 for (const name of COPIED) {
   const original = path.join(REPO_ROOT, name)
   const copy = path.join(PACKAGE_ROOT, name)
@@ -63,6 +67,10 @@ console.log('=== what npm would actually pack ===')
     }
     check('the vendored MIT text ships', packed.includes('vendor/preview/touying/0.8.0/LICENSE'))
     check('the vendored uniwarn text ships', packed.includes('vendor/preview/uniwarn/0.1.1/LICENSE'))
+    // Both READMEs, because the Chinese one is the default and the English one is
+    // how a non-Chinese reader gets the same document.
+    check('the Chinese README ships', packed.includes('README.md'))
+    check('the English README ships', packed.includes('README_EN.md'))
     // The font and compiler obligations are described in the notices, so the notices
     // shipping is what makes them reachable from a package install rather than only
     // from a clone.
