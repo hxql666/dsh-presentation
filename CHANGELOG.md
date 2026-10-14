@@ -5,6 +5,51 @@
 
 ---
 
+## 0.5.2
+
+### 修复
+
+- **README 里一处错误的 DSH 兼容性声明**。原文写"bundle patch 针对
+  `@deepseek-ai/dsh-agent-preset` 与 `@deepseek-ai/dsh-app-boot`"。实测：
+  `dsh-app-boot` 在 `cordis.patch.yml` 里出现 **0 次**，`dsh-agent-preset` 出现 **2 次**。
+
+  **`dsh-app-boot` 是 DSH 真实存在的包**（在 `app.asar` 里出现 87 次），所以这个说法
+  *看着很合理* —— 这正是它长期没被发现的原因：从来没有任何东西验证过它。
+  现在改为"**只针对一个包**：`@deepseek-ai/dsh-agent-preset`"，并解释为什么
+  （它是 entry group，所以 bundle patch 能向它插入一行）。
+
+- **仓库根的 `npm test` 只跑 9 个套件**，而包内跑 26 个。从仓库根测试会**静默跳过**
+  0.5.0 之后新增的全部套件（`escape-vectors`、`determinism`、`readme-parity`…）。
+  根脚本现在委托给包，两条入口一致。
+
+- 仓库根 `package.json` 的描述仍在说 "and its Agent preset" —— 预设从 0.2.0 起就在
+  插件自己的 patch 里，不再是一个独立包。
+
+### 元数据
+
+- **npm keywords 与仓库的 7 个 GitHub topic 对齐**（`deepseek-harness`、`dsh-plugin`、
+  `dsh`、`cordis`、`typst`、`touying`、`pdf-generation`）。此前 keywords 缺
+  `deepseek-harness` 与 `cordis`，而这两个正是生态里更常用的写法；`pdf` 太泛，去掉。
+  额外只保留一个 `typst-package` —— Typst 用户在 npm 上会搜它，而本包 vendored 并
+  再分发了两个 Typst 包。
+
+- **新增 `test/topics-metadata-test.mjs`**：断言每个 topic 在 keywords 里都有对应、
+  多余的词有理由、以及每个 topic 都能在代码里找到依据。GitHub topic 无法在构建时读取，
+  所以清单在测试里重复一遍 —— **那正是用意**：期望值变化时测试会失败，而那正是该决定
+  元数据是否跟进的时刻。
+
+### 本鲸的两次判断失误（记录在案）
+
+- 曾把这个项目判定为"不符合 `touying` 协议"。**错的。** 依据是搜索结果第一页的 12 条，
+  而总数是 26 条；全查后发现其中 6 个不是主题/模板，包括一个几乎同类的仓库
+  `statzhero/typst-touying-skill`（★1，给 LLM 用的 Touying 演示技能）。
+  本插件的 7 套主题**全部 import 自 Touying 的内置主题**，整个演示层由 Touying 实现，
+  符合度没有问题。
+- 用来验证 topic 的检查脚本硬编码了 `dsh-app-boot` 这个字符串，于是误报
+  `deepseek-harness` 不受支持。判据已改为"patch 里命名的所有包是否都是 `@deepseek-ai/*`"。
+
+---
+
 ## 0.5.1
 
 ### 变更

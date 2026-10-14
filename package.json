@@ -2,20 +2,14 @@
   "name": "dsh-presentation-repo",
   "private": true,
   "version": "0.0.0",
-  "description": "Monorepo for the DSH presentation-document plugin and its Agent preset.",
+  "description": "Monorepo for @hxql/dsh-presentation: a presentation-document mode for DeepSeek Harness that turns structured page data into a PDF via Typst + Touying, with a visual self-review loop.",
   "type": "module",
   "license": "MIT",
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
-    "test": "npm run typecheck && node packages/dsh-presentation/test/schema-gate.mjs && node packages/dsh-presentation/test/assemble-test.mjs && node packages/dsh-presentation/test/final-sweep.mjs && node packages/dsh-presentation/test/handout-test.mjs && node packages/dsh-presentation/test/locale-test.mjs && node packages/dsh-presentation/test/system-typst-test.mjs && node packages/dsh-presentation/test/scene-test.mjs && node packages/dsh-presentation/test/scene-build-test.mjs && node packages/dsh-presentation/test/encoding-audit.mjs",
-    "test:schema": "node packages/dsh-presentation/test/schema-gate.mjs",
-    "test:assemble": "node packages/dsh-presentation/test/assemble-test.mjs",
-    "test:sweep": "node packages/dsh-presentation/test/final-sweep.mjs",
-    "test:handout": "node packages/dsh-presentation/test/handout-test.mjs",
-    "test:locale": "node packages/dsh-presentation/test/locale-test.mjs",
-    "test:typst": "node packages/dsh-presentation/test/system-typst-test.mjs",
+    "test": "npm run typecheck && npm test --workspace=@hxql/dsh-presentation",
     "typecheck": "tsc -p tsconfig.json"
   },
   "engines": {
