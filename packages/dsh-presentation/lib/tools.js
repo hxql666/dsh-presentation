@@ -21,6 +21,7 @@ import { EngineError, REQUIRED_TYPST, VENDORED_TOUYING, resolveBinary } from './
 import { defineTool } from './host.js'
 import { isActive, readModeState, DECK_DIR } from './mode.js'
 import { LAYOUTS, LOCALES, normalizeDeckSpec } from './render.js'
+import { inkFraction } from './png.js'
 import { SCENES, applyScene, findScene } from './scenes.js'
 
 /** Layout id -> what the page is for. Kept next to `LAYOUTS` so they cannot drift. */
@@ -143,6 +144,17 @@ export function validateSpec(spec) {
 
   return { errors, warnings }
 }
+
+/**
+ * The ink fraction at which a page is reported as too dense.
+ *
+ * Calibrated by measurement rather than chosen: a comfortably full page lands
+ * between 0.04 and 0.15, and a page whose content has run past the bottom lands
+ * near 0.24 (a bullets page with fourteen long items, which drew its last line
+ * through the footer). The threshold sits between the two with room on both sides,
+ * so ordinary pages are not flagged and an overfull one is.
+ */
+const DENSE_PAGE = 0.19
 
 const THEMES = ['metropolis', 'simple', 'university', 'dewdrop', 'stargazer', 'aqua', 'default']
 const FONT_STACKS = ['sans', 'serif', 'cjk-sans']
@@ -489,16 +501,30 @@ function buildToolDefinitions(config) {
           ok: { type: 'boolean', required: true },
           images: { type: 'array', items: { type: 'string' } },
           outDir: { type: 'string' },
+          density: {
+            type: 'array',
+            items: { type: 'object', additionalProperties: true },
+            description: 'Per-page ink coverage, as a fraction of the page area.',
+          },
+          tooDense: { type: 'array', items: { type: 'string' } },
           diagnostics: { type: 'array', items: { type: 'object', additionalProperties: true } },
         },
       },
       render: (_args, value) => {
         if (value.ok !== true) return text(`Rendering failed.\n${diagnosticText(value.diagnostics) || value.stderr || ''}`)
+        const dense = value.tooDense ?? []
+        const warning = dense.length === 0
+          ? ''
+          : `\n\nWARNING: ${dense.length} page(s) are packed close to the edge, which usually means ` +
+            `${dense.length === 1 ? 'its content has' : 'their content has'} run past the bottom of the slide:\n` +
+            `${dense.map((line) => `- ${line}`).join('\n')}\n` +
+            'Look at those pages first. Trim the items, shorten the text, or split the page across two frames.'
         return text(
           `Rendered ${value.images.length} page image(s) in ${value.outDir ?? 'the preview directory'}:\n` +
           `${value.images.join('\n')}\n\n` +
           'Read these images with the image-reading tool and inspect them before delivering the deck. ' +
-          'Only the pages listed were written; anything else in that directory was removed.',
+          'Only the pages listed were written; anything else in that directory was removed.' +
+          warning,
         )
       },
     },
@@ -538,10 +564,35 @@ function buildToolDefinitions(config) {
         ...binaryOption(),
         timeoutMs: config.timeoutMs,
       })
+
+      // Measure how full each page is.
+      //
+      // This is the only overflow signal available. The layouts compose with grid
+      // and stack, and Touying reports a 0pt content height for that composition, so
+      // its own overflow detection cannot see a page whose content has run past the
+      // bottom — measured directly: a bullets page with fourteen long items drew the
+      // last line through the footer and reported no overflow at all. Density
+      // separates the two clearly (0.24 for that page against 0.04 for a normal
+      // one), which is enough to point the reviewer at the page.
+      const dense = []
+      const measured = []
+      for (const file of result.files.slice(0, config.maxPages)) {
+        try {
+          const { ink } = inkFraction(file)
+          measured.push({ page: path.basename(file), ink: Number(ink.toFixed(4)) })
+          if (ink >= DENSE_PAGE) dense.push(`${path.basename(file)} (${(ink * 100).toFixed(1)}% of the page is ink)`)
+        } catch {
+          // A page that cannot be decoded must not fail the check; the image is
+          // still returned for the reviewer to look at.
+        }
+      }
+
       return jsonSafe({
         ok: result.files.length > 0,
         images: result.files.slice(0, config.maxPages),
         outDir: previewDir,
+        density: measured,
+        tooDense: dense.length > 0 ? dense : undefined,
         diagnostics: result.diagnostics,
         stderr: result.files.length > 0 ? undefined : result.stderr,
       })
