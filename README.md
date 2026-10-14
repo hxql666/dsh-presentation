@@ -286,6 +286,18 @@ npm install
 dsh plugin --profile desktop add "$PWD/packages/dsh-presentation"
 ```
 
+### 把页面图放到你指定的位置
+
+`deck_check` 默认把 PNG 写到 deck 目录下的 `preview/`。传 `outDir` 可以改到别处 —— 归档目录、报告的资源目录：
+
+```jsonc
+{ "outDir": "01-talk/pages", "pages": [1, 2, 3] }
+```
+
+相对路径相对 deck 目录解析，且**必须留在 deck 目录内**。这条限制是刻意的：`outDir` 来自模型输出，而 **Typst 的 `--root` 只限制文档能读什么，不限制编译器往哪写** —— 实测过，用 root 之外的输出路径，文件确实写到了外面。所以工具层这道包含检查是 deck spec 与任意写之间的**唯一防线**，它是硬拒绝而不是警告。
+
+渲染还会清掉与输出模式匹配的旧 PNG，所以一个目录里不会混着两次构建的页。
+
 ## 使用
 
 ```
