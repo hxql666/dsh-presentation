@@ -4,7 +4,7 @@
 # is active; it is the whole point of the mode, so it lives with the row.
 - insert:
     - id: presentation-mode
-      name: '@hxql666/dsh-presentation'
+      name: '@hxql/dsh-presentation'
       config:
         section: |
           You are in presentation-document mode. The deliverable is a PDF presentation, not code.

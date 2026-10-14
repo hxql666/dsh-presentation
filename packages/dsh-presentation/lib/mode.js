@@ -27,7 +27,7 @@
  * harness-free test double, for example) falls back to folding from the start
  * on every read.
  *
- * @module @hxql666/dsh-presentation/mode
+ * @module @hxql/dsh-presentation/mode
  */
 
 /** The logged command records the mode state is derived from. */

@@ -1,4 +1,4 @@
-# @hxql666/dsh-presentation
+# @hxql/dsh-presentation
 
 演示文档模式（Presentation-Document Mode）—— 一个 DSH 协作模式插件：以结构化数据驱动
 Typst + Touying 生成 PDF 演示文稿，并带**视觉自审闭环**。

@@ -93,7 +93,7 @@
           - id: present
             name: '@deepseek-ai/dsh-tool-present'
           - id: presentation
-            name: '@hxql666/dsh-presentation'
+            name: '@hxql/dsh-presentation'
             config:
               # `section` is required by the plugin and is the only place this
               # guidance belongs: the plugin adds it to the request only while

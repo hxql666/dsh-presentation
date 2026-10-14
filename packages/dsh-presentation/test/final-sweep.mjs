@@ -1,4 +1,4 @@
-// Part of the @hxql666/dsh-presentation test suite. Run it from anywhere:
+// Part of the @hxql/dsh-presentation test suite. Run it from anywhere:
 //
 //   node <this file>
 //
@@ -33,7 +33,7 @@ console.log(`        vendored Touying ${VENDORED_TOUYING}; required Typst ${REQU
 const spec = {
   title: "能力覆盖检查",
   subtitle: "全部 14 种页型",
-  author: "@hxql666/dsh-presentation",
+  author: "@hxql/dsh-presentation",
   slides: [
     { layout: "cover" },
     { layout: "section", title: "分节页" },

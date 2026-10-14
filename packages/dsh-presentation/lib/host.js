@@ -24,7 +24,7 @@
  * here, exactly as in `@deepseek-ai/dsh-tools`, and both are asserted against
  * the enforced raw subset before the definition is returned.
  *
- * @module @hxql666/dsh-presentation/lib/host
+ * @module @hxql/dsh-presentation/lib/host
  */
 
 /** Annotation keywords the DSL copies through to the raw schema. */
@@ -647,7 +647,7 @@ export function resolveConfig(raw) {
   const known = new Set(CONFIG_FIELDS.map((field) => field.key))
   const unknown = Object.keys(input).filter((key) => !known.has(key))
   if (unknown.length > 0) {
-    throw new Error(`@hxql666/dsh-presentation config has unknown key(s) ${unknown.join(', ')} — known keys: ${[...known].join(', ')}`)
+    throw new Error(`@hxql/dsh-presentation config has unknown key(s) ${unknown.join(', ')} — known keys: ${[...known].join(', ')}`)
   }
 
   const resolved = {}
@@ -655,21 +655,21 @@ export function resolveConfig(raw) {
     const value = input[field.key]
     if (value === undefined) {
       if (field.required === true) {
-        throw new Error(`@hxql666/dsh-presentation config needs a non-empty \`${field.key}\` (${field.description})`)
+        throw new Error(`@hxql/dsh-presentation config needs a non-empty \`${field.key}\` (${field.description})`)
       }
       resolved[field.key] = field.default
       continue
     }
     if (field.type === 'string') {
-      if (typeof value !== 'string') throw new Error(`@hxql666/dsh-presentation config \`${field.key}\` must be a string`)
+      if (typeof value !== 'string') throw new Error(`@hxql/dsh-presentation config \`${field.key}\` must be a string`)
       if (field.required === true && value.trim() === '') {
-        throw new Error(`@hxql666/dsh-presentation config needs a non-empty \`${field.key}\` (${field.description})`)
+        throw new Error(`@hxql/dsh-presentation config needs a non-empty \`${field.key}\` (${field.description})`)
       }
       resolved[field.key] = value
       continue
     }
     if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
-      throw new Error(`@hxql666/dsh-presentation config \`${field.key}\` must be a positive number`)
+      throw new Error(`@hxql/dsh-presentation config \`${field.key}\` must be a positive number`)
     }
     resolved[field.key] = value
   }

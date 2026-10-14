@@ -16,7 +16,7 @@
  * installed into a profile from a workspace path is loaded from that path, and
  * the host's own module graph is not resolvable from there; see `lib/host.js`.
  *
- * @module @hxql666/dsh-presentation
+ * @module @hxql/dsh-presentation
  */
 import { CONFIG_FIELDS, createUserMessage, resolveConfig } from './lib/host.js'
 import {
@@ -27,7 +27,7 @@ import {
 import { registerTools } from './lib/tools.js'
 
 /** Loader row name. */
-export const name = '@hxql666/dsh-presentation'
+export const name = '@hxql/dsh-presentation'
 
 /**
  * Services this plugin needs. `systemPrompt` carries the mode's guidance
@@ -175,7 +175,7 @@ export function apply(ctx, rawConfig) {
         source: { kind: 'presentation-mode', form: 'notice', summary: notice },
       }))
     } catch (error) {
-      ctx.logger?.warn?.('@hxql666/dsh-presentation: failed to record the mode switch: %o', error)
+      ctx.logger?.warn?.('@hxql/dsh-presentation: failed to record the mode switch: %o', error)
     }
     return 'committed'
   }
@@ -183,7 +183,7 @@ export function apply(ctx, rawConfig) {
   // --- the human command -------------------------------------------------
   ctx.inject(['commands'], (commandCtx) => {
     commandCtx.commands.register({
-      definitionId: '@hxql666/dsh-presentation',
+      definitionId: '@hxql/dsh-presentation',
       name: MODE_COMMAND,
       description: 'Enter or leave presentation-document mode',
       input: { hint: '[off|handout|theme:<name>]', attachments: false },

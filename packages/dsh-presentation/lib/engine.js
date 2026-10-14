@@ -7,7 +7,7 @@
  * user's `%LOCALAPPDATA%\typst` store — package lookup, package cache, and
  * compiled output all stay inside explicit paths we own.
  *
- * @module @hxql666/dsh-presentation/engine
+ * @module @hxql/dsh-presentation/engine
  */
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'

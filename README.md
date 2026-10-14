@@ -1,4 +1,4 @@
-# @hxql666/dsh-presentation
+# @hxql/dsh-presentation
 
 A presentation-document mode for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH):
 decks are authored as **structured page data**, compiled to PDF with
@@ -50,8 +50,8 @@ Two packages, and they are installed separately:
 
 | Package | What it gives you |
 |---|---|
-| `@hxql666/dsh-presentation` | the plugin: the `/deck` mode and the five deck tools |
-| `@hxql666/dsh-presentation-preset` | the Agent preset: the card in **Settings → Agent preset** and the mode picker |
+| `@hxql/dsh-presentation` | the plugin: the `/deck` mode and the five deck tools |
+| `@hxql/dsh-presentation-preset` | the Agent preset: the card in **Settings → Agent preset** and the mode picker |
 
 Install only the plugin and `/deck` works inside whatever preset you already
 use. Add the preset to get the picker entry as well.
@@ -60,10 +60,10 @@ use. Add the preset to get the picker entry as well.
 
 ```bash
 # the plugin, which is the part that does the work
-dsh plugin --profile desktop add @hxql666/dsh-presentation
+dsh plugin --profile desktop add @hxql/dsh-presentation
 
 # optional: the Agent preset, for the mode picker
-dsh plugin --profile desktop add @hxql666/dsh-presentation-preset
+dsh plugin --profile desktop add @hxql/dsh-presentation-preset
 ```
 
 ### From a clone
@@ -216,7 +216,7 @@ with their licenses and obligations in
 
 # 中文说明
 
-[English](#@hxql666/dsh-presentation) | 中文
+[English](#hxqldsh-presentation) | 中文
 
 ## 这是什么
 
@@ -252,15 +252,15 @@ Typst + Touying 编译成 PDF，并把页面**渲染回图片让 agent 亲眼看
 
 | 包 | 作用 |
 |---|---|
-| `@hxql666/dsh-presentation` | 插件本体：`/deck` 模式与五个 deck 工具 |
-| `@hxql666/dsh-presentation-preset` | Agent 预设：**设置 → Agent 预设** 与新对话模式选择器里的卡片 |
+| `@hxql/dsh-presentation` | 插件本体：`/deck` 模式与五个 deck 工具 |
+| `@hxql/dsh-presentation-preset` | Agent 预设：**设置 → Agent 预设** 与新对话模式选择器里的卡片 |
 
 只装插件，`/deck` 在你现有预设下就能用；再装预设才多出模式选择器里的入口。
 
 ```bash
 # 从 npm（推荐）
-dsh plugin --profile desktop add @hxql666/dsh-presentation
-dsh plugin --profile desktop add @hxql666/dsh-presentation-preset
+dsh plugin --profile desktop add @hxql/dsh-presentation
+dsh plugin --profile desktop add @hxql/dsh-presentation-preset
 
 # 或从一个克隆
 git clone https://github.com/hxql666/dsh-presentation

@@ -1,4 +1,4 @@
-// Part of the @hxql666/dsh-presentation test suite. Run it from anywhere:
+// Part of the @hxql/dsh-presentation test suite. Run it from anywhere:
 //
 //   node <this file>
 //
@@ -23,7 +23,7 @@ const spec = applyScene(
   {
     title: "场景预设验证",
     subtitle: "学术报告",
-    author: "@hxql666/dsh-presentation",
+    author: "@hxql/dsh-presentation",
     slides: [
       { layout: "cover" },
       { layout: "agenda", title: "目录", items: ["问题", "方法", "结果"] },

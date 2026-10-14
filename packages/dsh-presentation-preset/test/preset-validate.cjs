@@ -193,7 +193,7 @@ if (missing > 0) {
 // preset mounts, and a preset that fails to mount shows as broken instead of
 // partially working — so the requirement is checked here.
 const REQUIRED_CONFIG = {
-  '@hxql666/dsh-presentation': ['section'],
+  '@hxql/dsh-presentation': ['section'],
 }
 
 console.log('')

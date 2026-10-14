@@ -13,7 +13,7 @@
  * through `jsonSafe` because the host rejects a result that does not survive a
  * JSON round trip — an `undefined` member is a rejection, not an absent field.
  *
- * @module @hxql666/dsh-presentation/tools
+ * @module @hxql/dsh-presentation/tools
  */
 import path from 'node:path'
 import { buildDeckPdf, prepareDeck, renderDeckPages, writePdfpc } from './build.js'
@@ -151,7 +151,7 @@ export function registerTools(ctx, config) {
     } catch (error) {
       const reason = Array.isArray(error?.violations) ? error.violations.join('; ') : String(error?.message ?? error)
       skipped.push({ name: definition.name, reason })
-      ctx.logger?.warn?.(`@hxql666/dsh-presentation: skipped tool ${definition.name} — its schema did not compile: ${reason}`)
+      ctx.logger?.warn?.(`@hxql/dsh-presentation: skipped tool ${definition.name} — its schema did not compile: ${reason}`)
       continue
     }
     ctx.tools.register(tool)

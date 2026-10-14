@@ -7,7 +7,7 @@
  * compiler is given `--root` pointing at that directory, so a deck can never
  * read or write outside its own folder.
  *
- * @module @hxql666/dsh-presentation/build
+ * @module @hxql/dsh-presentation/build
  */
 import fs from 'node:fs'
 import path from 'node:path'

@@ -1,4 +1,4 @@
-// Part of the @hxql666/dsh-presentation test suite. Run it from anywhere:
+// Part of the @hxql/dsh-presentation test suite. Run it from anywhere:
 //
 //   node <this file>
 //

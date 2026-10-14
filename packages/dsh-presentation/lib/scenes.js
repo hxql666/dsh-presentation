@@ -12,7 +12,7 @@
  * overridden per deck, and the page sequence names layouts rather than fixed
  * pages, so the model still decides what each page says.
  *
- * @module @hxql666/dsh-presentation/scenes
+ * @module @hxql/dsh-presentation/scenes
  */
 
 /**

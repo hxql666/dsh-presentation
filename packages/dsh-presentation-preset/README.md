@@ -1,4 +1,4 @@
-# @hxql666/dsh-presentation-preset
+# @hxql/dsh-presentation-preset
 
 为 DeepSeek Harness 增加第五个 **Agent 预设**：`演示模式`。装好后出现在
 **设置 → Agent 预设** 与**新对话的模式选择器**里，和 标准模式 / PTC 模式 / 极简模式 / 创造模式 并列。
@@ -10,20 +10,20 @@
 | **Agent 预设** | standard / ptc / minimal / cordis | 设置页的预设卡片、新对话模式下拉 |
 | **协作模式** | `plan` | 对话里的 `/plan`（模式开关，不是预设） |
 
-本仓库是**预设**；真正的排版能力在 `@hxql666/dsh-presentation`（协作模式插件）里。
+本仓库是**预设**；真正的排版能力在 `@hxql/dsh-presentation`（协作模式插件）里。
 换句话说：
 
-- 只装 `@hxql666/dsh-presentation` → 在任何预设下都能用 `/deck`，但模式列表里看不到新选项。
+- 只装 `@hxql/dsh-presentation` → 在任何预设下都能用 `/deck`，但模式列表里看不到新选项。
 - 再装本 bundle → 模式列表里多一个「演示模式」，进去就是面向演示文稿的能力集。
 
-两者互不依赖对方的顺序，但**预设里的 `presentation` 行指向 `@hxql666/dsh-presentation`**，
+两者互不依赖对方的顺序，但**预设里的 `presentation` 行指向 `@hxql/dsh-presentation`**，
 所以那个包必须同时作为 profile 依赖存在（`install_bundle` 已保证）。
 
 ## 预设内容
 
 在 standard 的基础上改三处：
 
-1. **加入 `@hxql666/dsh-presentation`** —— 这是 deck 工具存在的原因。
+1. **加入 `@hxql/dsh-presentation`** —— 这是 deck 工具存在的原因。
 2. **去掉 shell 行**（`tool-bash` / `tool-pwsh`）。做演示文稿需要的是工作区，不是终端：
    插件自己解析并运行 Typst 编译器，留一个 shell 只会扩大演示会话需要推理的表面
    （也扩大请求前缀）。
@@ -58,7 +58,7 @@ node packages/dsh-presentation-preset/test/preset-validate.cjs
    dsh 安装目录、以及 `app.asar` 的清单（Node 穿不透 asar，但插件加载器可以，
    所以这里查解包出的 asar 头）。判定表里 `dsh-tool-present`、`dsh-plugin-manager/tools`
    正是只能从 asar 满足的两行。
-3. **必填的插件 config 是否漏** —— 这一项是踩过的坑：`@hxql666/dsh-presentation` 的
+3. **必填的插件 config 是否漏** —— 这一项是踩过的坑：`@hxql/dsh-presentation` 的
    `section` 曾漏写，那会让**整个预设**挂载失败，而不是只坏一个工具。
 
 另外可用权威来源核对合成结果：
