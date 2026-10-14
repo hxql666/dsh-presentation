@@ -349,6 +349,13 @@ function buildToolDefinitions(config) {
         items: { type: 'integer' },
       },
       ppi: { type: 'integer', description: `Raster resolution. Default ${config.checkPpi}.` },
+      outDir: {
+        type: 'string',
+        description:
+          'Directory for the images, absolute or relative to the deck directory. Default "preview" beside the build. ' +
+          'Use this to place the pages where a report or an archive expects them — a model cannot copy a file, so the ' +
+          'render has to write them in the right place. Must stay inside the deck directory.',
+      },
     },
     output: {
       schema: {
@@ -357,14 +364,17 @@ function buildToolDefinitions(config) {
         properties: {
           ok: { type: 'boolean', required: true },
           images: { type: 'array', items: { type: 'string' } },
+          outDir: { type: 'string' },
           diagnostics: { type: 'array', items: { type: 'object', additionalProperties: true } },
         },
       },
       render: (_args, value) => {
         if (value.ok !== true) return text(`Rendering failed.\n${diagnosticText(value.diagnostics) || value.stderr || ''}`)
         return text(
-          `Rendered ${value.images.length} page image(s):\n${value.images.join('\n')}\n\n` +
-          'Read these images with the image-reading tool and inspect them before delivering the deck.',
+          `Rendered ${value.images.length} page image(s) in ${value.outDir ?? 'the preview directory'}:\n` +
+          `${value.images.join('\n')}\n\n` +
+          'Read these images with the image-reading tool and inspect them before delivering the deck. ' +
+          'Only the pages listed were written; anything else in that directory was removed.',
         )
       },
     },
@@ -376,10 +386,29 @@ function buildToolDefinitions(config) {
       const requested = Array.isArray(args.pages) ? args.pages.filter((p) => Number.isInteger(p) && p > 0) : []
       const pages = requested.length > 0 ? requested.slice(0, config.maxPages) : undefined
 
+      // Where the images go. The default sits beside the build, but a caller that
+      // needs the pages somewhere specific — an archive folder, a report — must be
+      // able to say so: a model has no way to copy or move a file, so without this
+      // the images can only ever land in one place. A relative path is resolved
+      // against the deck directory, and the result is confined to the deck tree.
+      const requestedDir = typeof args.outDir === 'string' ? args.outDir.trim() : ''
+      let previewDir = path.join(dir, 'preview')
+      if (requestedDir !== '') {
+        const resolved = path.resolve(dir, requestedDir)
+        const relative = path.relative(dir, resolved)
+        if (relative.startsWith('..') || path.isAbsolute(relative)) {
+          throw new EngineError(
+            'bad-outdir',
+            `outDir must stay inside the deck directory (${dir}); ${JSON.stringify(requestedDir)} resolves outside it`,
+          )
+        }
+        previewDir = resolved
+      }
+
       const result = await renderDeckPages({
         typFile,
         buildDir,
-        outputPattern: path.join(dir, 'preview', 'page-{p}.png'),
+        outputPattern: path.join(previewDir, 'page-{p}.png'),
         ppi: Number.isInteger(args.ppi) ? args.ppi : config.checkPpi,
         pages,
         ...binaryOption(),
@@ -388,6 +417,7 @@ function buildToolDefinitions(config) {
       return jsonSafe({
         ok: result.files.length > 0,
         images: result.files.slice(0, config.maxPages),
+        outDir: previewDir,
         diagnostics: result.diagnostics,
         stderr: result.files.length > 0 ? undefined : result.stderr,
       })

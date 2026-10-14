@@ -68,6 +68,27 @@ npm install          # fetches the Typst binary for this platform
 dsh plugin --profile desktop add "$PWD/packages/dsh-presentation"
 ```
 
+### Putting the page images where you want them
+
+`deck_check` writes its PNGs to `preview/` under the deck directory by default.
+Pass `outDir` to send them somewhere else — an archive folder, a report's asset
+directory:
+
+```jsonc
+{ "outDir": "01-talk/pages", "pages": [1, 2, 3] }
+```
+
+A relative path resolves against the deck directory, and the directory must stay
+inside it. That restriction is deliberate: `outDir` is model-supplied, and
+**Typst's `--root` confines what a document may read, not where the compiler
+writes**. Verified by rendering with a pattern outside the compile root: the files
+are written outside it. The containment check in the tool layer is therefore the
+only thing standing between a deck spec and an arbitrary write, so it is a refusal
+rather than a warning.
+
+Rendering also clears the PNGs already matching the output pattern, so a directory
+never mixes pages from two builds.
+
 ### Why not a git URL
 
 A plugin that ships a platform binary does not install reliably from a git URL,
