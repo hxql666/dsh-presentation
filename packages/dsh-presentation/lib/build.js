@@ -281,6 +281,70 @@ export async function renderDeckPages({ typFile, buildDir, outputPattern, ppi = 
 }
 
 /**
+ * Compile an already-generated document to PDF, without rebuilding it.
+ *
+ * `deck_build` writes both the spec and the Typst source, so a second export can
+ * compile the same source again. That matters for the vector export: re-deriving it
+ * from the spec risks a file that differs from the deck that was reviewed (a spec
+ * edited after the build, a scene applied differently), while recompiling the source
+ * cannot. Typst's PDF output is vector, so there is nothing to rasterise.
+ *
+ * The output is written through a temporary file and moved into place, so a failure
+ * cannot leave a half-written PDF where a reader might pick it up.
+ *
+ * @param {object} options
+ * @param {string} options.typFile
+ * @param {string} options.buildDir
+ * @param {string} options.outFile
+ * @param {string} [options.typstBinary]
+ * @param {string} [options.typstPath]
+ * @param {number} [options.timeoutMs]
+ * @param {number} [options.maxOutputBytes]
+ * @returns {Promise<{ ok: boolean, outFile?: string, bytes?: number, pages?: number,
+ *   diagnostics: object[], stderr: string }>}
+ */
+export async function compileDocumentPdf({ typFile, buildDir, outFile, typstBinary, typstPath, timeoutMs = 120000, maxOutputBytes }) {
+  if (!fs.existsSync(typFile)) {
+    return { ok: false, diagnostics: [], stderr: `no generated document at ${typFile}; build the deck first` }
+  }
+  const binary = resolveBinary({ configured: typstBinary, preferSystem: typstPath === 'system' })
+  ensureDir(path.dirname(outFile))
+  // Typst infers the output format from the path's extension, so the temporary file
+  // has to keep a `.pdf` suffix — `deck.vector.pdf.partial` is rejected with
+  // "could not infer output format". Renaming it into place afterwards is what gives
+  // the all-or-nothing property.
+  const temporary = `${outFile}.partial.pdf`
+
+  const result = await runTypst({
+    binary: binary.path,
+    args: ['compile', '--root', buildDir, '--package-path', packagePath(), '--diagnostic-format', 'short', typFile, temporary],
+    cwd: buildDir,
+    timeoutMs,
+  })
+  const diagnostics = parseDiagnostics(result.stderr)
+  if (result.timedOut) {
+    return { ok: false, diagnostics, stderr: `PDF compilation exceeded ${timeoutMs} ms and was stopped` }
+  }
+  if (result.code !== 0) {
+    try {
+      fs.rmSync(temporary, { force: true })
+    } catch {
+      // Nothing to clean up if it was never written.
+    }
+    return { ok: false, diagnostics, stderr: result.stderr.slice(-8000) }
+  }
+
+  const bytes = fs.statSync(temporary).size
+  if (typeof maxOutputBytes === 'number' && bytes > maxOutputBytes) {
+    fs.rmSync(temporary, { force: true })
+    return { ok: false, diagnostics, stderr: `the PDF is ${bytes} bytes, above the configured maxOutputBytes (${maxOutputBytes})` }
+  }
+
+  fs.renameSync(temporary, outFile)
+  return { ok: true, outFile, bytes, pages: countPdfPages(outFile), diagnostics, stderr: result.stderr.slice(-8000) }
+}
+
+/**
  * Extract the pdfpc speaker-note metadata into a `.pdfpc` sidecar file.
  *
  * @param {object} options

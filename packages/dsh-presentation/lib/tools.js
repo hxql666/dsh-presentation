@@ -16,7 +16,7 @@
  * @module @hxql/dsh-presentation/tools
  */
 import path from 'node:path'
-import { buildDeckPdf, prepareDeck, renderDeckPages, writePdfpc } from './build.js'
+import { buildDeckPdf, compileDocumentPdf, prepareDeck, renderDeckPages, writePdfpc } from './build.js'
 import { EngineError, REQUIRED_TYPST, VENDORED_TOUYING, resolveBinary } from './engine.js'
 import { defineTool } from './host.js'
 import { isActive, readModeState, DECK_DIR } from './mode.js'
@@ -610,16 +610,19 @@ function buildToolDefinitions(config) {
     name: 'deck_export',
     description:
       'Produce derived artifacts from the last successful build. In presentation-document mode only. ' +
-      '`handout` writes the print form (Touying collapses subslides; see the deck_build notes on why the bundled ' +
-      'layouts produce none yet); `notes` writes a .pdfpc speaker-note sidecar for pdfpc two-screen presenting.',
+      '`vector` writes a vector PDF of the same pages, for printing or importing into Keynote, Acrobat or ' +
+      'Illustrator: the deck PDF is already vector, but this names the intent and is the file to hand to a ' +
+      'print shop. `handout` writes the print form (Touying collapses subslides; see the deck_build notes on ' +
+      'why the bundled layouts produce none yet). `notes` writes a .pdfpc speaker-note sidecar for pdfpc ' +
+      'two-screen presenting.',
     parameters: {
       what: {
         type: 'string',
         required: true,
-        enum: ['handout', 'notes'],
+        enum: ['vector', 'handout', 'notes'],
         description: 'Which artifact to produce.',
       },
-      spec: { type: 'object', additionalProperties: true, description: 'The deck spec. Required for `handout`; omit for `notes`, which reuses the last build.' },
+      spec: { type: 'object', additionalProperties: true, description: 'The deck spec. Required for `handout`; omit for `vector` and `notes`, which reuse the last build.' },
     },
     output: {
       schema: {
@@ -640,6 +643,33 @@ function buildToolDefinitions(config) {
     async execute(args, exec) {
       const session = ensureMode(exec, 'deck_export')
       const dir = deckDir(exec, config.workdir)
+
+      if (args.what === 'vector') {
+        // Typst emits vector PDF natively, so this is a second compile of the same
+        // source — no rasterisation, no quality loss. It compiles the generated
+        // document rather than re-deriving one from the spec, so it cannot drift
+        // from the deck that was reviewed: a spec edited after the build, or a scene
+        // applied differently, would otherwise produce a different file under a name
+        // that claims to be the same deck.
+        const buildDir = path.join(dir, 'build')
+        const outFile = path.join(dir, 'deck.vector.pdf')
+        const result = await compileDocumentPdf({
+          typFile: path.join(buildDir, 'body.typ'),
+          buildDir,
+          outFile,
+          ...binaryOption(),
+          timeoutMs: config.timeoutMs,
+          maxOutputBytes: config.maxOutputBytes,
+        })
+        return jsonSafe({
+          ok: result.ok,
+          file: result.ok ? outFile : undefined,
+          bytes: result.bytes,
+          pages: result.pages,
+          diagnostics: result.diagnostics,
+          stderr: result.ok ? undefined : result.stderr,
+        })
+      }
 
       if (args.what === 'notes') {
         const result = await writePdfpc({

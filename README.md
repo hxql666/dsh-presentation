@@ -32,6 +32,7 @@ This plugin takes the layout away from the model:
 | Path | What it is |
 |---|---|
 | [`packages/dsh-presentation`](packages/dsh-presentation) | One package. It ships the collaboration mode (`/deck`) and five deck tools, and its bundle patch declares the Agent preset that puts a card in **Settings → Agent preset** and in the new-session mode picker. |
+| [`CHANGELOG.md`](CHANGELOG.md) | What changed in each release, and why. Every entry names the evidence behind the change. |
 
 These are two different DSH mechanisms, and the distinction matters:
 
