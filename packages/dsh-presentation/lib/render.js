@@ -85,34 +85,70 @@ function q(text) {
 }
 
 /**
- * Escape model-authored inline text so it always renders literally, while
- * keeping two deliberate emphases: `**bold**` and `*italic*`.
+ * Turn model-authored inline text into a Typst content block.
  *
- * Escaping is a single left-to-right pass over the staged markers, so a
- * backslash introduced for one character can never be re-escaped by a later
- * step (the bug a sequence of `replaceAll` passes invites).
+ * A Typst *string* renders literally: `text("a *b* c")` prints the asterisks,
+ * which is why `**bold**` used to reach the page as `*bold*`. Markup is only
+ * parsed inside a content block, so the emitted value is `[...]`.
+ *
+ * Everything inside that block is escaped, including `*` and `_`, so a model
+ * cannot smuggle in Typst syntax. The two documented emphases become explicit
+ * `strong[…]` / `emph[…]` calls, which is why their markers do not need to
+ * survive escaping.
+ *
+ * The scan is one pass over the text, so a backslash introduced while escaping one
+ * character can never be escaped again by a later step — the bug a sequence of
+ * `replaceAll` passes invites.
+ *
+ * @param {unknown} text
+ * @returns {string} A Typst content block, e.g. `[plain #strong[bold] plain]`.
  */
-function esc(text) {
-  const raw = String(text)
-  const BOLD = '\u0001'
-  const ITAL = '\u0002'
-  const SPECIAL = new Set([...'\\#$@~`[]<>_"\''])
-  const staged = raw.replaceAll('**', BOLD).replaceAll('*', ITAL)
+function contentOf(text) {
+  const raw = String(text ?? '')
+  // Everything Typst treats specially inside a content block.
+  const SPECIAL = new Set([...'\\#$@~`[]<>_"\'*_'])
+  const escapeRun = (run) => {
+    let out = ''
+    for (const ch of run) out += SPECIAL.has(ch) ? `\\${ch}` : ch
+    return out
+  }
 
   let out = ''
-  for (const ch of staged) {
-    if (ch === BOLD) out += '*'
-    else if (ch === ITAL) out += '_'
-    else if (SPECIAL.has(ch)) out += `\\${ch}`
-    else out += ch
+  let plain = ''
+  let index = 0
+  while (index < raw.length) {
+    // `**` is bold, a lone `*` is italic — the longer marker is tested first so
+    // the pair is never read as two italics.
+    const marker = raw.startsWith('**', index) ? '**' : raw[index] === '*' ? '*' : undefined
+    if (marker === undefined) {
+      plain += raw[index]
+      index += 1
+      continue
+    }
+
+    const closing = raw.indexOf(marker, index + marker.length)
+    if (closing === -1) {
+      // No closing marker: the asterisk is literal text, not emphasis.
+      plain += marker
+      index += marker.length
+      continue
+    }
+
+    out += escapeRun(plain)
+    plain = ''
+    // The `#` is required: inside a content block, `strong[...]` is the literal
+    // text "strong[…]" — the hash is what makes it a call.
+    out += `#${marker === '**' ? 'strong' : 'emph'}[${escapeRun(raw.slice(index + marker.length, closing))}]`
+    index = closing + marker.length
   }
-  return out
+  out += escapeRun(plain)
+  return `[${out}]`
 }
 
 /** Emit a Typst string from model text, or `none` for an absent value. */
 function t(text) {
   if (text === undefined || text === null) return 'none'
-  return q(esc(text))
+  return contentOf(text)
 }
 
 /**
@@ -243,11 +279,14 @@ function slideLiteral(slide) {
     }
     case 'code':
       push('source', q(String(slide.source ?? '')))
-      push('language', t(slide.language))
+      // A plain string, not a content block: this reaches `raw(…, lang: …)`, which
+      // requires a string.
+      push('language', q(slide.language ?? 'typ'))
       break
     case 'image-text':
       push('body', lines(slide.body))
-      push('image', slide.image === undefined ? undefined : t(slide.image))
+      // A path, so also a string rather than content.
+      push('image', slide.image === undefined ? undefined : q(String(slide.image)))
       push('caption', t(slide.caption))
       break
     case 'columns': {

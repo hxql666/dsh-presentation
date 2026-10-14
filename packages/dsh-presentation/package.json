@@ -1,6 +1,6 @@
 {
   "name": "@hxql/dsh-presentation",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Presentation-document mode for DeepSeek Harness: author Typst/Touying decks as structured data, compile to PDF with a visual self-review loop. · DSH 演示文档模式：以结构化数据驱动 Typst/Touying 生成 PDF 演示文稿。",
   "type": "module",
   "license": "MIT",
@@ -33,7 +33,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "node test/schema-gate.mjs && node test/assemble-test.mjs && node test/final-sweep.mjs && node test/handout-test.mjs && node test/locale-test.mjs && node test/system-typst-test.mjs && node test/scene-test.mjs && node test/scene-build-test.mjs && node test/pagecount-test.mjs && node test/stale-preview-test.mjs && node test/outdir-test.mjs && node test/theme-layout-matrix-test.mjs && node test/visual-title-test.mjs && node test/encoding-audit.mjs",
+    "test": "node test/schema-gate.mjs && node test/assemble-test.mjs && node test/final-sweep.mjs && node test/handout-test.mjs && node test/locale-test.mjs && node test/system-typst-test.mjs && node test/scene-test.mjs && node test/scene-build-test.mjs && node test/pagecount-test.mjs && node test/stale-preview-test.mjs && node test/outdir-test.mjs && node test/theme-layout-matrix-test.mjs && node test/visual-title-test.mjs && node test/bold-test.mjs && node test/encoding-audit.mjs",
     "prepublishOnly": "node test/schema-gate.mjs"
   },
   "repository": {
