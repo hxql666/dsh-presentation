@@ -9,7 +9,7 @@
  *
  * @module @hxql/dsh-presentation/engine
  */
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import { createRequire } from 'node:module'
@@ -32,8 +32,113 @@ const PLATFORM_PACKAGES = {
 /** The single Typst release this plugin is built and verified against. */
 export const REQUIRED_TYPST = '0.15.1'
 
+/**
+ * The lowest Typst release the vendored Touying can compile under.
+ *
+ * Touying 0.8.0 declares `compiler = "0.15.0"`, so a Typst older than this is
+ * rejected rather than tried: it would fail deep inside the template with an
+ * error that says nothing about the real cause.
+ */
+export const MIN_TYPST = '0.15.0'
+
 /** The Touying release vendored under `vendor/preview/touying`. */
 export const VENDORED_TOUYING = '0.8.0'
+
+/**
+ * Compare two `major.minor.patch` version strings.
+ *
+ * Intentionally not semver: Typst publishes plain three-part versions, and the
+ * only question asked here is whether one is at least as new as another.
+ *
+ * @returns {number} negative when `a < b`, zero when equal, positive when `a > b`.
+ */
+export function compareVersions(a, b) {
+  const parse = (value) => String(value).split('.').map((part) => Number.parseInt(part, 10) || 0)
+  const left = parse(a)
+  const right = parse(b)
+  for (let index = 0; index < 3; index += 1) {
+    const difference = (left[index] ?? 0) - (right[index] ?? 0)
+    if (difference !== 0) return difference
+  }
+  return 0
+}
+
+/**
+ * A Typst executable already on this machine, if it is new enough to use.
+ *
+ * Shipping a 50 MB platform binary is the largest cost this plugin imposes on a
+ * user, and anyone who already has Typst installed should not pay it. The
+ * version is asked of the binary itself rather than assumed, because a Typst
+ * older than the vendored Touying needs gives a confusing failure at compile
+ * time instead of a clear refusal here.
+ *
+ * @param {string} command
+ * @returns {{path: string, version: string, source: string, verified: boolean}|undefined}
+ */
+/**
+ * Run `<candidate> --version` and return the version it reports.
+ *
+ * Windows cannot spawn a `.cmd` or `.bat` shim directly — Node raises EINVAL —
+ * and the usual workaround, `shell: true`, makes Node warn (DEP0190) that
+ * arguments are concatenated rather than escaped. Calling `cmd.exe /d /s /c`
+ * explicitly handles the shims (which npm global installs create) without the
+ * warning and without involving a shell for a real `.exe`.
+ */
+function readTypstVersion(candidate) {
+  const extension = path.extname(candidate).toLowerCase()
+  const needsCommandInterpreter = process.platform === 'win32' && (extension === '.cmd' || extension === '.bat')
+  const file = needsCommandInterpreter ? process.env.ComSpec ?? 'cmd.exe' : candidate
+  const args = needsCommandInterpreter ? ['/d', '/s', '/c', candidate, '--version'] : ['--version']
+
+  let probe
+  try {
+    probe = spawnSync(file, args, { encoding: 'utf8', timeout: 10000, windowsHide: true })
+  } catch {
+    return undefined
+  }
+  if (probe.error !== undefined || probe.status !== 0) return undefined
+
+  // `typst --version` prints e.g. "typst 0.15.1 (…)".
+  return /\b(\d+\.\d+\.\d+)\b/.exec(`${probe.stdout ?? ''}${probe.stderr ?? ''}`)?.[1]
+}
+
+/**
+ * A Typst executable already on this machine, if it is new enough to use.
+ *
+ * Shipping a 50 MB platform binary is the largest cost this plugin imposes on a
+ * user, and anyone who already has Typst installed should not pay it. The
+ * version is asked of the binary itself rather than assumed, because a Typst
+ * older than the vendored Touying needs gives a confusing failure at compile
+ * time instead of a clear refusal here.
+ *
+ * @param {string} command
+ * @returns {{path: string, version: string, source: string, verified: boolean}|undefined}
+ */
+function findSystemTypst(command) {
+  // Resolve the name to a concrete path first: `where` and `which` are the
+  // platform's own resolvers, so PATHEXT handling stays correct and the result
+  // can be inspected before it is executed.
+  const locator = process.platform === 'win32' ? 'where' : 'which'
+  let located
+  try {
+    located = spawnSync(locator, [command], { encoding: 'utf8', timeout: 10000, windowsHide: true })
+  } catch {
+    return undefined
+  }
+  if (located.error !== undefined || located.status !== 0) return undefined
+
+  const candidate = `${located.stdout ?? ''}`
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line !== '' && fs.existsSync(line))
+  if (candidate === undefined) return undefined
+
+  const version = readTypstVersion(candidate)
+  if (version === undefined) return undefined
+  if (compareVersions(version, MIN_TYPST) < 0) return undefined
+
+  return { path: candidate, version, source: `system:${command}`, verified: false }
+}
 
 /** Engine failures carry a stable `code` for the model-facing tool layer. */
 export class EngineError extends Error {
@@ -76,9 +181,28 @@ export function resolveBinary(options = {}) {
   }
 
   const key = `${process.platform}-${process.arch}`
+
+  // An already-installed Typst is preferred when the user asks for it, because
+  // it costs no download at all. The bundled binary stays the default so an
+  // existing installation keeps behaving exactly as before.
+  const useSystemFirst = options.preferSystem === true
+  if (useSystemFirst) {
+    const system = findSystemTypst(options.systemCommand ?? 'typst')
+    if (system !== undefined) return system
+  }
+
   const candidates = PLATFORM_PACKAGES[key]
   if (candidates === undefined) {
-    throw new EngineError('platform-unsupported', `no bundled Typst binary for platform ${key}; set typstBinaryPath in the plugin config`)
+    // No bundled binary exists for this platform, so a system Typst is the only
+    // remaining option. Try it before refusing: this is what makes a 32-bit or
+    // linux-armv7 machine work without the user discovering a config key.
+    const system = findSystemTypst(options.systemCommand ?? 'typst')
+    if (system !== undefined) return system
+    throw new EngineError(
+      'platform-unsupported',
+      `no bundled Typst binary for platform ${key}, and no Typst ${MIN_TYPST}+ was found on PATH. ` +
+        `Install Typst ${REQUIRED_TYPST} or newer, or set typstBinaryPath in the plugin config.`,
+    )
   }
 
   const attempted = []
@@ -123,9 +247,16 @@ export function resolveBinary(options = {}) {
     }
   }
 
+  // The bundled binary is missing even though this platform has one (usually a
+  // skipped optional dependency). A Typst the user already has is a better
+  // answer than an error, so try that before giving up.
+  const system = findSystemTypst(options.systemCommand ?? 'typst')
+  if (system !== undefined) return system
+
   throw new EngineError(
     'binary-unavailable',
-    `no Typst binary is available for ${key}. Install the plugin's platform dependency or set typstBinaryPath. Tried: ${attempted.join(' | ')}`,
+    `no Typst binary is available for ${key}. Install the plugin's platform dependency, install Typst ` +
+      `${MIN_TYPST}+ and put it on PATH, or set typstBinaryPath. Tried: ${attempted.join(' | ')}`,
   )
 }
 

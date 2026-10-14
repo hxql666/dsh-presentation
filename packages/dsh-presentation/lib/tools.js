@@ -169,7 +169,9 @@ export function registerTools(ctx, config) {
  * @returns {object[]} Tool definitions in the author DSL.
  */
 function buildToolDefinitions(config) {
-  const binaryOption = () => config.typstBinaryPath
+  // Both values travel together so no call site can pass one and forget the
+  // other: the explicit path, and which Typst the user prefers to use.
+  const binaryOption = () => ({ typstBinary: config.typstBinaryPath, typstPath: config.typstPath })
 
   // --- deck_build --------------------------------------------------------
   const deckBuild = {
@@ -288,7 +290,7 @@ function buildToolDefinitions(config) {
         spec,
         buildDir: path.join(dir, 'build'),
         outFile,
-        typstBinary: binaryOption(),
+        ...binaryOption(),
         timeoutMs: config.timeoutMs,
         maxOutputBytes: config.maxOutputBytes,
       })
@@ -302,7 +304,7 @@ function buildToolDefinitions(config) {
             spec,
             buildDir: path.join(dir, 'build-handout'),
             outFile: handoutFile,
-            typstBinary: binaryOption(),
+            ...binaryOption(),
             timeoutMs: config.timeoutMs,
             maxOutputBytes: config.maxOutputBytes,
             handout: true,
@@ -380,7 +382,7 @@ function buildToolDefinitions(config) {
         outputPattern: path.join(dir, 'preview', 'page-{p}.png'),
         ppi: Number.isInteger(args.ppi) ? args.ppi : config.checkPpi,
         pages,
-        typstBinary: binaryOption(),
+        ...binaryOption(),
         timeoutMs: config.timeoutMs,
       })
       return jsonSafe({
@@ -433,7 +435,7 @@ function buildToolDefinitions(config) {
           typFile: path.join(dir, 'build', 'body.typ'),
           buildDir: path.join(dir, 'build'),
           outFile: path.join(dir, 'deck.pdfpc'),
-          typstBinary: binaryOption(),
+          ...binaryOption(),
           timeoutMs: config.timeoutMs,
         })
         return jsonSafe({ ok: result.ok, file: result.outFile, bytes: result.bytes, diagnostics: result.diagnostics, stderr: result.stderr })
@@ -447,7 +449,7 @@ function buildToolDefinitions(config) {
         spec,
         buildDir: path.join(dir, 'build-handout'),
         outFile,
-        typstBinary: binaryOption(),
+        ...binaryOption(),
         timeoutMs: config.timeoutMs,
         maxOutputBytes: config.maxOutputBytes,
         handout: true,
@@ -484,7 +486,7 @@ function buildToolDefinitions(config) {
 
       let binary
       try {
-        binary = resolveBinary({ configured: binaryOption() })
+        binary = resolveBinary({ configured: config.typstBinaryPath, preferSystem: config.typstPath === 'system' })
       } catch (error) {
         binary = undefined
       }

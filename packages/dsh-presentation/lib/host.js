@@ -630,6 +630,7 @@ export const CONFIG_FIELDS = [
   { key: 'locale', type: 'string', default: 'zh', description: 'Default locale key; selects the Typst language facts used for line breaking and punctuation.' },
   { key: 'workdir', type: 'string', default: '', description: 'Deck directory, relative to the session workspace. Empty means "deck".' },
   { key: 'typstBinaryPath', type: 'string', default: '', description: 'Explicit Typst executable. Empty uses the bundled, hash-verified binary.' },
+  { key: 'typstPath', type: 'string', default: 'auto', description: 'Which Typst to use: "auto" prefers the bundled binary and falls back to one on PATH, "system" prefers PATH so nothing is downloaded, "bundled" uses only the bundled binary.' },
   { key: 'timeoutMs', type: 'number', default: 180000, description: 'Per-compilation deadline.' },
   { key: 'maxOutputBytes', type: 'number', default: 67108864, description: 'Largest PDF this plugin will accept.' },
   { key: 'maxPages', type: 'number', default: 200, description: 'Largest page count this plugin will render or accept.' },

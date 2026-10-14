@@ -100,6 +100,7 @@ Typst + Touying 生成 PDF 演示文稿，并带**视觉自审闭环**。
 | `locale` | `zh` | 语言事实（断行、连字符、标点整形），不是显示偏好。英文文稿应设为 `en` |
 | `workdir` | `''` | deck 目录（相对会话工作区）；空表示 `deck` |
 | `typstBinaryPath` | `''` | 显式 Typst 可执行文件；空则用内置且校验 |
+| `typstPath` | `auto` | 用哪个 Typst：`auto` 优先内置、缺失时用 PATH；`system` 优先 PATH（零下载）；`bundled` 只用内置 |
 | `timeoutMs` | `180000` | 单次编译期限 |
 | `maxOutputBytes` | `67108864` | PDF 体积上限 |
 | `maxPages` | `200` | 页数上限 |
@@ -155,7 +156,117 @@ node packages/dsh-presentation/test/encoding-audit.mjs   # 编码/BOM/乱码自�
 `set_plugin` 禁用再启用拿到的仍是旧模块。改插件源码后用
 `node scripts/package-plugin.mjs <新包名>` 打包成新身份，再 `install_bundle`。
 
+## Typst: bundled, or the one you already have
+
+```
+50.1 MB   bundled platform binary (one per platform, fetched at install time)
+```
+
+That download is the largest cost this plugin imposes, so it is avoidable in two
+ways.
+
+### Use a Typst you already have
+
+If `typst --version` reports **0.15.0 or newer** on your `PATH`, the plugin can
+use it and download nothing:
+
+```yaml
+typstPath: system      # prefer PATH; fall back to the bundled binary
+```
+
+Three values are accepted:
+
+| `typstPath` | Behaviour |
+|---|---|
+| `auto` (default) | Prefer the bundled binary; if it is missing, use one from `PATH` |
+| `system` | Prefer `PATH`, so nothing is downloaded; fall back to bundled |
+| `bundled` | Use only the bundled binary |
+
+An explicitly older Typst is **refused, not tried**: Touying 0.8.0 needs Typst
+0.15.0+, and a 0.14 binary would fail deep inside the template with a message
+that says nothing about the real cause. The version is read from the binary
+(`typst --version`) rather than assumed.
+
+Anything found on `PATH` reports `verified: false` — the SHA-256 check exists to
+prove the *bundled* binary is the one its package describes, and cannot attest to
+a binary you installed yourself.
+
+### Skip the download entirely
+
+The platform packages are `optionalDependencies`, so a package manager that is
+told to skip optional dependencies installs no binary at all:
+
+```bash
+npm install --omit=optional     # then set typstPath: system
+```
+
+That is also the answer for platforms with no bundled binary — 32-bit systems,
+`linux-armv7`, BSD: install Typst 0.15.1+ yourself and put it on `PATH`.
+
+### Why there is no smaller binary
+
+Measured, not assumed. The obvious alternative is WebAssembly:
+
+| Option | Size | Verdict |
+|---|---|---|
+| bundled native binary | **50.1 MB** | what ships today |
+| `typst.ts` 0.7.0 (WASM) | 27.7 MB package, but 78 MB with its dependencies | embeds Typst **0.13.1** — below the 0.15.0 floor |
+| `typst.ts` 0.8.0-rc3 | 83.9 MB with dependencies | still a release candidate; larger than native |
+| `@blocknote/xl-typst-compiler` | 25.5 MB | **GPL-3.0 or proprietary** — unusable here |
+
+The WASM builds are not platform-trimmed, so they cost more than the one native
+binary a platform actually needs, and the stable one is two minor Typst versions
+behind what the vendored Touying requires. A smaller download is only possible
+with a different compiler, which would mean sacrificing the layout primitives and
+CJK typesetting this plugin is built on.
+
 ## 平台与语言
+
+## Typst：内置的，或你已经装好的
+
+内置的平台二进制是 **50.1 MB**（按平台各一个，安装时拉取）—— 这是本插件给用户
+带来的最大成本，但有两条路可以避开。
+
+**用你已经装好的 Typst**：若 `typst --version` 显示 **0.15.0 或更高**，配置
+
+```yaml
+typstPath: system      # 优先用 PATH 里的，不下载；找不到再回退到内置
+```
+
+| `typstPath` | 行为 |
+|---|---|
+| `auto`（默认） | 优先内置；内置缺失时用 PATH 里的 |
+| `system` | 优先 PATH，零下载；回退内置 |
+| `bundled` | 只用内置 |
+
+**版本太旧的会被拒绝，而不是硬试** —— Touying 0.8.0 要求 Typst 0.15.0+，
+0.14 的二进制会在模板深处报一个跟真实原因无关的错。版本由二进制自己
+（`typst --version`）报出，不靠猜。
+
+PATH 里找到的二进制标记为 `verified: false`：那个 SHA-256 校验证明的是**内置**
+二进制与其包描述一致，无法为你自己装的二进制背书。
+
+**完全跳过下载**：平台包是 `optionalDependencies`，让包管理器跳过可选依赖就不会装：
+
+```bash
+npm install --omit=optional     # 然后设 typstPath: system
+```
+
+这也解决了没有内置二进制的平台 —— 32 位系统、`linux-armv7`、BSD：
+自己装 Typst 0.15.1+ 放进 PATH 即可。
+
+**为什么没有更小的二进制**（实测，非推测）：
+
+| 方案 | 体积 | 结论 |
+|---|---|---|
+| 内置原生二进制 | **50.1 MB** | 当前方案 |
+| `typst.ts` 0.7.0（WASM） | 含依赖 78 MB | 内嵌 Typst **0.13.1**，低于 0.15.0 下限 |
+| `typst.ts` 0.8.0-rc3 | 含依赖 83.9 MB | 仍是 RC，且比原生更大 |
+| `@blocknote/xl-typst-compiler` | 25.5 MB | **GPL-3.0 或专有** —— 不可用 |
+
+WASM 构建没有按平台裁剪，所以比"每个平台实际只需的那一个原生二进制"更贵；
+而稳定版还落后内置 Touying 所要求的 Typst 两个 minor 版本。要更小的下载，
+只能换掉编译器 —— 那等于放弃本插件的版式原语与中文排版能力。
 
 **平台覆盖**：内置 Typst 二进制只覆盖 6 个目标 —— `win32-x64` `win32-arm64`
 `linux-x64` `linux-arm64` `darwin-x64` `darwin-arm64`。

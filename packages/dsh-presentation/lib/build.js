@@ -115,8 +115,8 @@ function copyReferencedAssets(spec, buildDir) {
  * @param {number} [options.maxOutputBytes]
  * @returns {Promise<object>} build facts, including structured diagnostics.
  */
-export async function buildDeckPdf({ spec, buildDir, outFile, typstBinary, timeoutMs = 180000, maxOutputBytes = 64 * 1024 * 1024, handout = false }) {
-  const binary = resolveBinary({ configured: typstBinary })
+export async function buildDeckPdf({ spec, buildDir, outFile, typstBinary, typstPath, timeoutMs = 180000, maxOutputBytes = 64 * 1024 * 1024, handout = false }) {
+  const binary = resolveBinary({ configured: typstBinary, preferSystem: typstPath === 'system' })
   const { typFile, specFile, spec: normalized } = prepareDeck({ spec, buildDir, handout })
   ensureDir(path.dirname(outFile))
 
@@ -204,8 +204,8 @@ export async function buildDeckPdf({ spec, buildDir, outFile, typstBinary, timeo
  * @param {number[]} [options.pages]      Optional 1-based page subset.
  * @returns {Promise<{ files: string[], diagnostics: object[] }>}
  */
-export async function renderDeckPages({ typFile, buildDir, outputPattern, ppi = 110, pages, typstBinary, timeoutMs = 180000 }) {
-  const binary = resolveBinary({ configured: typstBinary })
+export async function renderDeckPages({ typFile, buildDir, outputPattern, ppi = 110, pages, typstBinary, typstPath, timeoutMs = 180000 }) {
+  const binary = resolveBinary({ configured: typstBinary, preferSystem: typstPath === 'system' })
   // Typst writes into an existing directory only; create it before compiling.
   ensureDir(path.dirname(outputPattern.replace('{p}', '1')))
   const args = [
@@ -243,8 +243,8 @@ export async function renderDeckPages({ typFile, buildDir, outputPattern, ppi = 
 }
 
 /** Extract the pdfpc speaker-note metadata into a `.pdfpc` sidecar file. */
-export async function writePdfpc({ typFile, buildDir, outFile, typstBinary, timeoutMs = 120000 }) {
-  const binary = resolveBinary({ configured: typstBinary })
+export async function writePdfpc({ typFile, buildDir, outFile, typstBinary, typstPath, timeoutMs = 120000 }) {
+  const binary = resolveBinary({ configured: typstBinary, preferSystem: typstPath === 'system' })
   const result = await runTypst({
     binary: binary.path,
     args: ['query', '--root', buildDir, '--package-path', packagePath(), '--diagnostic-format', 'short', typFile, '<pdfpc-file>', '--format', 'json'],
