@@ -81,6 +81,24 @@ dsh plugin --profile desktop add "$PWD/packages/dsh-presentation-preset"
 Installed plugins load at startup, and a replaced package needs a fresh module
 generation before its new code is used.
 
+### If the plugin seems missing after installing the preset
+
+Regional mirrors sync the npm registry asynchronously, and a mirror can briefly
+serve a stale `latest` for the preset — one whose dependency on the plugin is
+absent. The install then succeeds and the plugin is simply not there.
+
+Check what you actually got, and install from the official registry if it is
+short:
+
+```bash
+npm ls @hxql/dsh-presentation          # is the plugin present?
+
+# force the official registry for this install
+npm install @hxql/dsh-presentation-preset --registry=https://registry.npmjs.org/
+```
+
+The mirror catches up on its own; retrying later works.
+
 ### Why not a git URL
 
 A plugin that ships a platform binary does not install reliably from a git URL,
@@ -280,6 +298,22 @@ dsh plugin --profile desktop add "$PWD/packages/dsh-presentation-preset"
 ```
 
 装完**必须重启应用**才会加载新的模块代。
+
+### 装了预设却好像没有插件？
+
+各地区镜像对 npm registry 是**异步同步**的，可能短暂地把预设的 `latest` 指向旧版本
+—— 而那个旧版本没有声明对插件的依赖。于是安装成功，插件却不在。
+
+先看实际装到了什么，缺了就从官方 registry 装：
+
+```bash
+npm ls @hxql/dsh-presentation          # 插件在不在？
+
+# 这次安装强制走官方
+npm install @hxql/dsh-presentation-preset --registry=https://registry.npmjs.org/
+```
+
+镜像会自己追上；过一会重试即可。
 
 **为什么不能直接用 git URL**：实测过 —— 带平台二进制的插件从 git URL 装不可靠。
 `npm install github:...` 会因为 npm 克隆整仓并执行根的 `prepare` 而失败；
