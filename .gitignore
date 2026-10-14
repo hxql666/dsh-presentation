@@ -25,3 +25,10 @@ desktop.ini
 *.log
 npm-debug.log*
 pnpm-debug.log*
+
+# Timestamped backups written by maintenance scripts, e.g.
+# `cordis.patch.yml.bak-20261014-133757`. A bare `*.bak-*` pattern does not match
+# these: the suffix follows a second extension, so the stem is `cordis.patch.yml`.
+*.bak
+*.bak-*
+*.bak.*
