@@ -252,6 +252,22 @@ The suite covers the failure modes that actually bit this project:
 - **Encoding damage is invisible until it breaks parsing.** A stray BOM or
   mojibake in a manifest is a real defect; the encoding audit sweeps for both.
 
+### 关于渲染缓存：实测后决定不做
+
+有人会问为什么 `deck_check` 每次都重新渲染所有页面。本鲸测过（`test/perf-measure.mjs`）：
+
+| deck 规模 | 构建 | 渲染全部 | 重新渲染全部 | 只渲染 1 页 |
+|---|---|---|---|---|
+| 5 页 | 590 ms | 605 ms | 468 ms | 561 ms |
+| 15 页 | 761 ms | 508 ms | 510 ms | 457 ms |
+| 40 页 | 763 ms | 802 ms | 734 ms | 779 ms |
+
+**关键一行是最后两列：只渲染 1 页和渲染全部几乎一样慢。** 耗时由 Typst 的进程启动与文档编译主导，光栅化只占小头，所以"只重渲染改动页"的缓存省不下多少。
+
+而缓存要付出的代价是：它必须正确判断"源码没变"，而 0.2.1 修掉的正是这个 ——
+`deck_check` 留下旧图并当成结果，模型据此审阅了**当前 deck 里不存在的页**。
+用一点点速度换回一个假阴性风险，不划算。
+
 ## Requirements
 
 - DeepSeek Harness (the plugin targets the `@deepseek-ai/cordis` 4.x plugin API)
