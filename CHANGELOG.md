@@ -5,6 +5,54 @@
 
 ---
 
+## 0.5.3
+
+### 修复（**升级 DSH 后演示模式完全不可用**）
+
+- **persona 行的 `suffix` 引用了宿主不存在的 prompt 变量 `{{cwd}}`**，导致每一轮在装配
+  system prompt 时抛错：
+
+  ```
+  unknown prompt variable "{{cwd}}" in section "deployment:persona-suffix";
+  registered variables: provider, model
+  ```
+
+  **DSH 0.2.1-rc.2 只注册了 `provider` 与 `model` 两个变量**（源码依据：
+  `@deepseek-ai/dsh-agent-loop` 里只有 `variable("provider")` 与 `variable("model")`）。
+  我们写的是 `Your working directory is {{cwd}}.`。
+
+  症状具有欺骗性：**预设正常挂载、会话能建、卡片能选**，然后**每一轮都报"本轮运行失败"**。
+  工作目录在新版里由 runtime context 提供（`CONTEXT_ORDERS.WORKING_DIRECTORY`），
+  不是一个 prompt 变量，所以那句直接去掉，`prefix` 里的 `{{model}}` 保留（合法）。
+
+### 为什么以前的检查没抓到
+
+这个缺陷**任何 schema 校验都发现不了**：`suffix` 是合法的字符串，config 键也对。
+错的是**模板内容**，而模板只在宿主装配 prompt 时才求值。
+
+本版本新增 `test/prompt-variables-test.mjs`：扫描 bundle patch 里每一个 `{{...}}`，
+断言其名字在宿主注册表内（`provider`、`model`），并检查 `{{` 都有闭合。
+宿主注册表在构建时读不到（在应用内部），所以清单写死在测试里 —— **这是刻意的**：
+宿主变量集变了，测试就该失败，那时才该决定 patch 是否跟进。
+
+已用仍在使用的旧 bundle 反向验证过这个测试确实会失败（v18 被判 `cwd` 非法）。
+
+### 排查过程中排除的方向（记录以免重走）
+
+- 插件代码本身：5 个工具注册、deck 能构建、Typst 0.15.1 哈希校验通过 —— 正常
+- 预设条目：`include:preset-presentation` `fiberPhase: active` —— 正常挂载
+- patch 语法：`insert` / `group: true` / `isolate` 对照本版本技能文档 —— 未变
+- 每个 row 的 config 键：与新版插件 schema 全部匹配（含 `plan-mode` 仍必填 `section`）
+- `apply` 用到的宿主 API：`systemPrompt.section` / `getSectionOrder('PLAN_POLICY')`（仍=500）/
+  `commands.register` / `agent/pre-step` —— 全在
+- 是否有别的 bundle 覆盖本预设 —— 没有
+
+也记录一处 CLI 误导：本机全局 `dsh` 是 **0.1.0-rc.7**，而桌面应用是 **0.2.1-rc.2**，
+所以 `dsh --dump-config` 报"无法解析 `@deepseek-ai/dsh-experimental-auto-review`"是
+**版本不匹配**，不是应用的病因。
+
+---
+
 ## 0.5.2
 
 ### 修复

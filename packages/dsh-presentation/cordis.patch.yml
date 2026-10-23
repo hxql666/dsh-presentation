@@ -36,7 +36,12 @@
           - id: persona
             name: '@deepseek-ai/dsh-persona'
             config:
-              suffix: Your working directory is {{cwd}}.
+              # Only prompt variables the host registers may appear here. `model` is
+              # one; the working directory is not a variable — it arrives as runtime
+              # context — so there is no `{{cwd}}` here. Passing one the host does not
+              # know throws while the system prompt is assembled, which fails the
+              # whole turn: `unknown prompt variable "{{cwd}}" in section
+              # "deployment:persona-suffix"`. test/prompt-variables-test.mjs guards it.
               prefix: You are a presentation-document agent powered by the {{model}} model. The deliverable is a PDF deck, not code.
           - id: agent-instructions
             name: '@deepseek-ai/dsh-agent-instructions'
