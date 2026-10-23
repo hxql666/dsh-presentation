@@ -34,6 +34,19 @@ Windows 通过，Ubuntu 与 macOS 在测试步骤失败。`npm test` 用 `&&` �
 - `ci.yml` 改成**每个套件一个步骤**，失败时发 `::error` 注解写明套件名与平台，并写进
   job summary。下一次失败可以直接从 checks API 读出是哪个套件，不用下载日志。
 
+- **CI 脚本自身两个坑**，都是靠注解定位的：
+  - `shell: bash` 在 GitHub 上默认带 `-e -o pipefail`，而 `detail=$(grep … | head …)`
+    在 grep 无匹配时返回 1 → 整步中止 → **连注解都没发出去**。现在显式 `set +e` /
+    `set +o pipefail`，并给管道加 `|| true`。
+  - macOS 自带 bash 3.2，**没有 `mapfile`**，作业在一行套件都没跑时以 exit 127 结束。
+    改为对字符串 `for` 循环。
+
+- **Linux runner 没有中日韩字体**，让两个套件在 Ubuntu 上失败而 macOS/Windows 通过：
+  `determinism-test` 看到"改了一页却没有变化"，`visual-title-test` 看到"有标题和无标题
+  渲染相同"。原因是 Typst 自带字体（New Computer Modern、Libertinus）不含 CJK，
+  中文渲染为空，两页自然一致。CI 现在在 Linux 装 `fonts-noto-cjk`，
+  `CONTRIBUTING.md` 也写明测试需要一个 CJK 字体（本包不分发字体）。
+
 ### 清理
 
 - 删掉 `test/` 下 11 个一次性调查脚本（从未进套件、多个硬编码 `E:\dsh_work\...`、
