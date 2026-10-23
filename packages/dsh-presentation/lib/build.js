@@ -14,14 +14,17 @@ import path from 'node:path'
 import {
   EngineError,
   VENDORED_TOUYING,
+  countPagesInBuffer,
   countPdfPages,
   ensureDir,
   fileSize,
+  isWriteDenied,
   packagePath,
   parseDiagnostics,
   parseOverflowWarnings,
   resolveBinary,
   runTypst,
+  runTypstBinary,
   templatePath,
 } from './engine.js'
 import { normalizeDeckSpec, renderDeckSource } from './render.js'
@@ -123,18 +126,28 @@ export async function buildDeckPdf({ spec, buildDir, outFile, typstBinary, typst
   const { typFile, specFile, spec: normalized } = prepareDeck({ spec, buildDir, handout })
   ensureDir(path.dirname(outFile))
 
-  const result = await runTypst({
+  // The compiler writes the PDF to standard output and this process writes the file.
+  //
+  // Not a preference: under the sandbox the compiler runs with a restricted token whose
+  // write capability is an ACL grant on the workspace, and when that grant is missing
+  // the compiler can write nowhere — every attempt ends in
+  // `error: failed to write PDF file (拒绝访问。 (os error 5))` while the host writes the
+  // same directory normally. Measured: `-` costs 292 ms against 306 ms for a file and
+  // produces identical bytes, so the reliable path is also the free one.
+  const command = [
+    'compile',
+    '--root', buildDir,
+    '--package-path', packagePath(),
+    '--diagnostic-format', 'short',
+    typFile,
+    '-',
+  ]
+  const result = await runTypstBinary({
     binary: binary.path,
-    args: [
-      'compile',
-      '--root', buildDir,
-      '--package-path', packagePath(),
-      '--diagnostic-format', 'short',
-      typFile,
-      outFile,
-    ],
+    args: command,
     cwd: buildDir,
     timeoutMs,
+    maxBytes: maxOutputBytes + 1024,
   })
 
   if (result.timedOut) {
@@ -153,12 +166,14 @@ export async function buildDeckPdf({ spec, buildDir, outFile, typstBinary, typst
       output: outFile,
       diagnostics,
       stderr: result.stderr.slice(-8000),
-      stdout: result.stdout.slice(-2000),
+      stdout: '',
     }
   }
 
-  const bytes = fileSize(outFile)
-  if (bytes === undefined) {
+  // A compiler that exited 0 but produced nothing on stdout is a failure, not an empty
+  // deck: the artifact travelled through a pipe, so its absence is the only signal.
+  const pdf = result.stdout
+  if (pdf.length === 0 || pdf.subarray(0, 4).toString('latin1') !== '%PDF') {
     return {
       ok: false,
       binary,
@@ -166,14 +181,24 @@ export async function buildDeckPdf({ spec, buildDir, outFile, typstBinary, typst
       specFile,
       spec: normalized,
       output: outFile,
-      diagnostics: [{ severity: 'error', message: 'the compiler reported success but wrote no output file', raw: result.stderr }],
+      diagnostics: [{
+        severity: 'error',
+        message: pdf.length === 0
+          ? 'the compiler reported success but wrote nothing to standard output'
+          : 'the compiler reported success but its standard output is not a PDF',
+        raw: result.stderr,
+      }],
       stderr: result.stderr.slice(-8000),
-      stdout: result.stdout.slice(-2000),
+      stdout: '',
     }
   }
-  if (bytes > maxOutputBytes) {
-    throw new EngineError('output-too-large', `the PDF is ${bytes} bytes, above the configured maxOutputBytes (${maxOutputBytes})`)
+
+  if (pdf.length > maxOutputBytes) {
+    throw new EngineError('output-too-large', `the PDF is ${pdf.length} bytes, above the configured maxOutputBytes (${maxOutputBytes})`)
   }
+
+  fs.writeFileSync(outFile, pdf)
+  const bytes = pdf.length
 
   const warnings = diagnostics.filter((entry) => entry.severity === 'warning')
   // Touying's measurement is the useful signal, not the generic warning text:
@@ -188,12 +213,92 @@ export async function buildDeckPdf({ spec, buildDir, outFile, typstBinary, typst
     spec: normalized,
     output: outFile,
     bytes,
-    pages: countPdfPages(outFile),
+    pages: countPagesInBuffer(pdf),
     diagnostics,
     warnings,
     overflow,
     stderr: result.stderr.slice(-8000),
+    // The argv the compiler actually ran with. Reported because the output argument is
+    // `-`: the child is never asked to write, which is the whole point, and a test can
+    // assert it rather than trusting a comment.
+    command,
   }
+}
+
+/**
+ * Render pages one at a time, taking each PNG from the compiler's standard output.
+ *
+ * The fallback for `renderDeckPages` when the compiler cannot write: it is the same
+ * render, with this process owning the file. Slower by design — the fixed cost of a
+ * compile is paid per page — so it is never the first choice, only the path that works
+ * where the sandbox withholds the workspace write grant.
+ *
+ * @param {object} options
+ * @param {string} options.binary
+ * @param {string} options.buildDir
+ * @param {string} options.typFile
+ * @param {string} options.outputPattern
+ * @param {number} options.ppi
+ * @param {number[]} [options.pages]
+ * @param {number} options.timeoutMs
+ * @returns {Promise<{ ok: boolean, diagnostics?: object[], stderr?: string }>}
+ */
+async function renderPagesThroughStdout({ binary, buildDir, typFile, outputPattern, ppi, pages, timeoutMs }) {
+  const base = [
+    'compile',
+    '--root', buildDir,
+    '--package-path', packagePath(),
+    '--format', 'png',
+    '--ppi', String(ppi),
+    '--diagnostic-format', 'short',
+  ]
+
+  // Without an explicit page list the count has to come from the document, and the
+  // PDF is the only thing that knows it. One extra compile which also travels through
+  // standard output, so it needs no write permission either.
+  let wanted = pages
+  if (wanted === undefined) {
+    const pdf = await runTypstBinary({
+      binary,
+      args: ['compile', '--root', buildDir, '--package-path', packagePath(), '--diagnostic-format', 'short', typFile, '-'],
+      cwd: buildDir,
+      timeoutMs,
+    })
+    if (pdf.timedOut) throw new EngineError('render-timeout', `PNG rendering exceeded ${timeoutMs} ms and was stopped`)
+    const count = countPagesInBuffer(pdf.stdout)
+    if (count === undefined) {
+      return {
+        ok: false,
+        diagnostics: parseDiagnostics(pdf.stderr),
+        stderr: `could not determine the page count while rendering through standard output: ${pdf.stderr.slice(-2000)}`,
+      }
+    }
+    wanted = Array.from({ length: count }, (_, index) => index + 1)
+  }
+
+  let diagnostics = []
+  for (const page of wanted) {
+    const result = await runTypstBinary({
+      binary,
+      args: [...base, '--pages', String(page), typFile, '-'],
+      cwd: buildDir,
+      timeoutMs,
+    })
+    if (result.timedOut) throw new EngineError('render-timeout', `PNG rendering exceeded ${timeoutMs} ms and was stopped`)
+    if (result.code !== 0) {
+      return {
+        ok: false,
+        diagnostics: parseDiagnostics(result.stderr),
+        stderr: result.stderr.slice(-8000),
+      }
+    }
+    if (result.stdout.length === 0) {
+      return { ok: false, diagnostics, stderr: `page ${page} rendered to an empty image` }
+    }
+    diagnostics = parseDiagnostics(result.stderr)
+    fs.writeFileSync(outputPattern.replace('{p}', String(page)), result.stdout)
+  }
+  return { ok: true, diagnostics }
 }
 
 /**
@@ -208,12 +313,18 @@ export async function buildDeckPdf({ spec, buildDir, outFile, typstBinary, typst
  * @param {string} [options.typstBinary]  Explicit compiler path.
  * @param {string} [options.typstPath]    Which Typst to prefer: auto, system, or bundled.
  * @param {number} [options.timeoutMs]
- * @returns {Promise<{ files: string[], pages: { page: number, file: string }[], diagnostics: object[], stderr: string }>}
+ * @param {boolean} [options.stdoutOnly]  Skip the child-writes path and capture every
+ *   page through standard output. The fallback below exists for an environment a test
+ *   cannot create — a sandbox that withholds the workspace write grant — so this seam
+ *   is how the fallback is kept honest: the suite renders the same deck both ways and
+ *   compares the bytes.
+ * @returns {Promise<{ files: string[], pages: { page: number, file: string }[], diagnostics: object[], stderr: string, viaStdout?: boolean }>}
  *   `pages` carries each rendered page's number beside its path, so a caller can
  *   relate a page back to the frame it came from. `stderr` is the tail the model
- *   needs when a page fails to render.
+ *   needs when a page fails to render. `viaStdout` is set when the compiler could not
+ *   write and the pages were captured through standard output instead.
  */
-export async function renderDeckPages({ typFile, buildDir, outputPattern, ppi = 110, pages, typstBinary, typstPath, timeoutMs = 180000 }) {
+export async function renderDeckPages({ typFile, buildDir, outputPattern, ppi = 110, pages, typstBinary, typstPath, timeoutMs = 180000, stdoutOnly = false }) {
   const binary = resolveBinary({ configured: typstBinary, preferSystem: typstPath === 'system' })
   // Typst writes into an existing directory only; create it before compiling.
   const dir = path.dirname(outputPattern.replace('{p}', '1'))
@@ -282,8 +393,31 @@ export async function renderDeckPages({ typFile, buildDir, outputPattern, ppi = 
   if (result.timedOut) {
     throw new EngineError('render-timeout', `PNG rendering exceeded ${timeoutMs} ms and was stopped`)
   }
-  const diagnostics = parseDiagnostics(result.stderr)
-  if (result.code !== 0) {
+  let diagnostics = parseDiagnostics(result.stderr)
+  let denial = ''
+
+  // The compiler writes the pages itself here: one invocation renders every page, and
+  // paying that fixed cost per page would be 7.9× slower (measured: 312 ms for eight
+  // pages against 2459 ms one at a time). When the sandbox refuses the write, the same
+  // render is repeated page by page with the bytes coming through standard output,
+  // which the host process then writes. The fallback is only paid on a machine whose
+  // sandbox workspace grant is missing — otherwise this branch never runs.
+  if (stdoutOnly || (result.code !== 0 && isWriteDenied(result.stderr))) {
+    denial = stdoutOnly ? 'forced by the caller' : result.stderr.slice(-8000)
+    const retried = await renderPagesThroughStdout({
+      binary: binary.path,
+      buildDir,
+      typFile,
+      outputPattern,
+      ppi,
+      pages: Array.isArray(pages) && pages.length > 0 ? pages : undefined,
+      timeoutMs,
+    })
+    if (retried.ok !== true) {
+      return { files: [], pages: [], diagnostics: retried.diagnostics ?? diagnostics, stderr: retried.stderr ?? denial }
+    }
+    diagnostics = retried.diagnostics ?? []
+  } else if (result.code !== 0) {
     return { files: [], pages: [], diagnostics, stderr: result.stderr.slice(-8000) }
   }
 
@@ -324,7 +458,13 @@ export async function renderDeckPages({ typFile, buildDir, outputPattern, ppi = 
     // Without a manifest the next render simply cleans nothing, which is safe.
   }
 
-  return { files: numbered.map((entry) => entry.file), pages: numbered, diagnostics, stderr: result.stderr.slice(-8000) }
+  return {
+    files: numbered.map((entry) => entry.file),
+    pages: numbered,
+    diagnostics,
+    stderr: result.stderr.slice(-8000),
+    ...(denial === '' ? {} : { viaStdout: true }),
+  }
 }
 
 /**
@@ -356,15 +496,15 @@ export async function compileDocumentPdf({ typFile, buildDir, outFile, typstBina
   }
   const binary = resolveBinary({ configured: typstBinary, preferSystem: typstPath === 'system' })
   ensureDir(path.dirname(outFile))
-  // Typst infers the output format from the path's extension, so the temporary file
-  // has to keep a `.pdf` suffix — `deck.vector.pdf.partial` is rejected with
-  // "could not infer output format". Renaming it into place afterwards is what gives
-  // the all-or-nothing property.
-  const temporary = `${outFile}.partial.pdf`
 
-  const result = await runTypst({
+  // Same reason as `buildDeckPdf`: the compiler writes to standard output and this
+  // process writes the file, because the compiler's own write is refused wherever the
+  // sandbox's workspace grant is missing. All-or-nothing comes for free now — a failed
+  // compilation produces no bytes, so the destination is never touched, which is what
+  // the temporary file and rename used to provide.
+  const result = await runTypstBinary({
     binary: binary.path,
-    args: ['compile', '--root', buildDir, '--package-path', packagePath(), '--diagnostic-format', 'short', typFile, temporary],
+    args: ['compile', '--root', buildDir, '--package-path', packagePath(), '--diagnostic-format', 'short', typFile, '-'],
     cwd: buildDir,
     timeoutMs,
   })
@@ -373,22 +513,25 @@ export async function compileDocumentPdf({ typFile, buildDir, outFile, typstBina
     return { ok: false, diagnostics, stderr: `PDF compilation exceeded ${timeoutMs} ms and was stopped` }
   }
   if (result.code !== 0) {
-    try {
-      fs.rmSync(temporary, { force: true })
-    } catch {
-      // Nothing to clean up if it was never written.
-    }
     return { ok: false, diagnostics, stderr: result.stderr.slice(-8000) }
   }
 
-  const bytes = fs.statSync(temporary).size
-  if (typeof maxOutputBytes === 'number' && bytes > maxOutputBytes) {
-    fs.rmSync(temporary, { force: true })
-    return { ok: false, diagnostics, stderr: `the PDF is ${bytes} bytes, above the configured maxOutputBytes (${maxOutputBytes})` }
+  const pdf = result.stdout
+  if (pdf.length === 0 || pdf.subarray(0, 4).toString('latin1') !== '%PDF') {
+    return {
+      ok: false,
+      diagnostics,
+      stderr: pdf.length === 0
+        ? 'the compiler reported success but wrote nothing to standard output'
+        : 'the compiler reported success but its standard output is not a PDF',
+    }
+  }
+  if (typeof maxOutputBytes === 'number' && pdf.length > maxOutputBytes) {
+    return { ok: false, diagnostics, stderr: `the PDF is ${pdf.length} bytes, above the configured maxOutputBytes (${maxOutputBytes})` }
   }
 
-  fs.renameSync(temporary, outFile)
-  return { ok: true, outFile, bytes, pages: countPdfPages(outFile), diagnostics, stderr: result.stderr.slice(-8000) }
+  fs.writeFileSync(outFile, pdf)
+  return { ok: true, outFile, bytes: pdf.length, pages: countPagesInBuffer(pdf), diagnostics, stderr: result.stderr.slice(-8000) }
 }
 
 /**

@@ -25,7 +25,7 @@ Typst + Touying 生成 PDF 演示文稿，并带**视觉自审闭环**。
 | 人类命令 | `/deck`、`/deck off`、`/deck handout`、`/deck theme:<name>`、`/deck scene:<name>`（`scene off` 清除） |
 | 工具 | 常驻注册，靠模式门控（进入/离开不改变请求工具目录，前缀缓存不受影响）|
 
-## 与宿主的三条硬契约（踩过的坑，勿回退）
+## 与宿主的四条硬契约（踩过的坑，勿回退）
 
 1. **工具 schema 必须编译成原始 JSON Schema。** 注册表把 `parameters` 原样投影进模型请求，
    不做编译；作者 DSL（`{ spec: { type: 'object', required: true } }`）直接上线会让请求里出现
@@ -39,6 +39,13 @@ Typst + Touying 生成 PDF 演示文稿，并带**视觉自审闭环**。
 3. **不要 append 新的事件类型。** 读取器只接受带 `ignorable: true` 的未知事件，而实时
    `Session.append()` 无法设置该标记 —— 写了 `presentation/mode` 这类自有事件，会话之后
    将拒绝重新打开。模式状态因此改为从 `/deck` 的命令记录推导。
+4. **不要让 Typst 子进程写产物。** 沙箱下子进程运行在**受限 token** 里，其写能力来自工作区上
+   一条**能力 SID 授权**（`S-1-4-*`）；授权缺失时子进程**哪儿都写不了**（含系统临时目录），
+   而宿主进程照常能写，于是每一轮都得到
+   `error: failed to write PDF file (拒绝访问。 (os error 5))`。
+   所以 PDF 一律用 `-` 走 stdout、由宿主写盘（实测零代价：292 ms vs 306 ms，字节一致）；
+   PNG 仍优先单次调用，被拒才回退逐页 stdout。
+   `test/write-path-test.mjs` 断言子进程 argv 里从不出现输出路径 —— 这条契约不靠注释守。
 
 ## 工具
 

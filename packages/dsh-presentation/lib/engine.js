@@ -348,6 +348,82 @@ export function runTypst({ binary, args, cwd, timeoutMs }) {
 }
 
 /**
+ * Run the Typst compiler and capture its standard output as bytes.
+ *
+ * Needed because of who is allowed to write. The sandbox runs the compiler under a
+ * restricted token whose write capability is an ACL grant on the workspace; when that
+ * grant is absent the compiler can write nowhere, and every output fails with
+ *
+ *     error: failed to write PDF file (拒绝访问。 (os error 5))
+ *
+ * while the host process — where this plugin runs — writes the same directory without
+ * complaint. Typst accepts `-` as the output path and writes the artifact to standard
+ * output instead, so the host can write the file itself and the result no longer
+ * depends on a grant this plugin cannot verify or provision.
+ *
+ * Measured cost of the detour: none for a PDF (292 ms through a pipe against 306 ms to
+ * a file), and the bytes are identical either way.
+ *
+ * @param {object} options
+ * @param {string} options.binary      Executable path.
+ * @param {string[]} options.args      Complete argv after the executable.
+ * @param {string} options.cwd         Working directory.
+ * @param {number} options.timeoutMs   Hard deadline; the process is killed on expiry.
+ * @param {number} [options.maxBytes]  Cap on captured stdout.
+ * @returns {Promise<{ code: number|null, stdout: Buffer, stderr: string, timedOut: boolean }>}
+ */
+export function runTypstBinary({ binary, args, cwd, timeoutMs, maxBytes = 512 * 1024 * 1024 }) {
+  return new Promise((resolve, reject) => {
+    let child
+    try {
+      child = spawn(binary, args, { cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
+    } catch (/** @type {any} */ error) {
+      reject(new EngineError('spawn-failed', `could not start the Typst compiler: ${String(error?.message ?? error)}`))
+      return
+    }
+    /** @type {Buffer[]} */
+    const chunks = []
+    let captured = 0
+    let stderr = ''
+    let timedOut = false
+    const stderrCap = 4 * 1024 * 1024
+    child.stdout.on('data', (/** @type {Buffer} */ chunk) => {
+      if (captured >= maxBytes) return
+      chunks.push(chunk)
+      captured += chunk.length
+    })
+    child.stderr.on('data', (chunk) => { if (stderr.length < stderrCap) stderr += chunk.toString('utf8') })
+    const timer = setTimeout(() => {
+      timedOut = true
+      child.kill('SIGKILL')
+    }, timeoutMs)
+    child.on('error', (error) => {
+      clearTimeout(timer)
+      reject(new EngineError('spawn-failed', `the Typst compiler failed to run: ${String(error?.message ?? error)}`))
+    })
+    child.on('close', (code) => {
+      clearTimeout(timer)
+      resolve({ code, stdout: Buffer.concat(chunks), stderr, timedOut })
+    })
+  })
+}
+
+/**
+ * Whether a compiler failure is the sandbox refusing the write.
+ *
+ * The message is the operating system's, localised: `os error 5` on Windows with the
+ * reason in the system language, and `Permission denied` (EACCES) elsewhere. Matching
+ * the code rather than the prose is what makes this work on a machine whose Windows
+ * error strings are not English.
+ *
+ * @param {string} stderr
+ * @returns {boolean}
+ */
+export function isWriteDenied(stderr) {
+  return /os error 5\b|Access is denied|Permission denied|operation not permitted/i.test(stderr)
+}
+
+/**
  * One diagnostic from the compiler.
  *
  * Every field beyond `severity`, `message` and `raw` is filled in by later lines
@@ -502,26 +578,38 @@ export function parseOverflowWarnings(stderr) {
  */
 export function countPdfPages(pdfPath) {
   try {
-    const buf = fs.readFileSync(pdfPath)
-    let count = 0
-    const needles = [Buffer.from('/Type /Page'), Buffer.from('/Type/Page')]
-    for (const needle of needles) {
-      let from = 0
-      for (;;) {
-        const at = buf.indexOf(needle, from)
-        if (at === -1) break
-        const next = buf[at + needle.length]
-        // `undefined` is end of file, which cannot continue a longer type name.
-        const longerName = next !== undefined && /[A-Za-z0-9]/.test(String.fromCharCode(next))
-        if (!longerName) count += 1
-        from = at + needle.length
-      }
-      if (count > 0) break
-    }
-    return count > 0 ? count : undefined
+    return countPagesInBuffer(fs.readFileSync(pdfPath))
   } catch {
     return undefined
   }
+}
+
+/**
+ * The same count, from bytes already in memory.
+ *
+ * Used when the PDF never became a file on this side: it came out of the compiler's
+ * standard output so the host process could own the write. See `runTypstBinary`.
+ *
+ * @param {Buffer} buf
+ * @returns {number|undefined}
+ */
+export function countPagesInBuffer(buf) {
+  let count = 0
+  const needles = [Buffer.from('/Type /Page'), Buffer.from('/Type/Page')]
+  for (const needle of needles) {
+    let from = 0
+    for (;;) {
+      const at = buf.indexOf(needle, from)
+      if (at === -1) break
+      const next = buf[at + needle.length]
+      // `undefined` is end of file, which cannot continue a longer type name.
+      const longerName = next !== undefined && /[A-Za-z0-9]/.test(String.fromCharCode(next))
+      if (!longerName) count += 1
+      from = at + needle.length
+    }
+    if (count > 0) break
+  }
+  return count > 0 ? count : undefined
 }
 
 export { PLUGIN_ROOT, PLUGIN_ROOT as pluginRoot }

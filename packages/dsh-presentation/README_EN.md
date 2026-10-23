@@ -135,6 +135,29 @@ starts with these tools" a choice; it is not a sandbox.
 | **Profile** | `desktop` throughout this document because that is the profile this was developed against. The plugin is profile-agnostic — substitute your own profile name. |
 | **Offline** | Works. The compiler and Touying are both local; nothing is fetched during a build. |
 
+### Who writes the artifact
+
+**The PDF and the page images are written by this plugin, in the host process. The Typst
+child only hands over bytes on standard output.**
+
+That is not a style choice. On Windows, the DSH sandbox runs child processes under a
+restricted token whose write capability is a capability-SID grant (`S-1-4-*`) on the
+workspace. When that grant is missing the child can write *nowhere* — not the workspace,
+not even the system temp directory — while the host process, holding your own token,
+writes the same directory without trouble. In the field it looks like this, every time:
+
+```
+error: failed to write PDF file (拒绝访问。 (os error 5))
+```
+
+The host can write and the child cannot, so the artifact is written by the host: Typst
+accepts `-` as its output path and writes to stdout instead. Measured cost: none (292 ms
+through a pipe against 306 ms to a file), and the bytes are identical. PNG rendering
+still prefers one invocation for the whole deck (312 ms for eight pages against 2459 ms
+one page at a time) and only falls back to per-page stdout when it is refused.
+`test/write-path-test.mjs` asserts that the child's argv never contains an output path
+and compares both paths byte for byte.
+
 ## Install
 
 ```bash
