@@ -68,26 +68,33 @@ jobs:
         shell: bash
         run: |
           cd packages/dsh-presentation
-          mapfile -t suites < <(node -e "const j=require('./package.json');console.log(j.scripts.test.split(' && ').map(s=>s.replace(/^node test\//,'').replace(/\.mjs$/,'')).join('\n'))")
-          echo "${#suites[@]} suites declared in package.json"
-          failed=()
-          for suite in "${suites[@]}"; do
+          # No `mapfile`: macOS ships bash 3.2, where it does not exist, and the job
+          # died with exit 127 before running a single suite.
+          suites=$(node -e "const j=require('./package.json');console.log(j.scripts.test.split(' && ').map(s=>s.replace(/^node test\//,'').replace(/\.mjs$/,'')).join(' '))")
+          count=$(echo "$suites" | wc -w | tr -d ' ')
+          echo "$count suites declared in package.json"
+          failed=""
+          for suite in $suites; do
             if node "test/$suite.mjs" > "$RUNNER_TEMP/$suite.log" 2>&1; then
               echo "ok    $suite"
             else
               echo "FAIL  $suite"
-              echo "::error title=suite:$suite (${{ matrix.os }})::test/$suite.mjs failed"
+              # The reason goes into the annotation, so a failure is diagnosable from
+              # the checks API alone. `%` and newlines are escaped because they are
+              # syntax in a workflow command.
+              detail=$(grep -E '^  FAIL|Error|error:' "$RUNNER_TEMP/$suite.log" | head -n 5 | tr '\n' '|' | sed 's/%/%25/g')
+              echo "::error title=suite:$suite (${{ matrix.os }})::${detail:-test/$suite.mjs failed (no FAIL line found)}"
               echo "--- tail of $suite ---"
               tail -n 30 "$RUNNER_TEMP/$suite.log"
-              failed+=("$suite")
+              failed="$failed $suite"
             fi
           done
-          if [ ${#failed[@]} -gt 0 ]; then
+          if [ -n "$failed" ]; then
             {
               echo "### Failed suites on ${{ matrix.os }}"
-              for suite in "${failed[@]}"; do echo "- \`$suite\`"; done
+              for suite in $failed; do echo "- \`$suite\`"; done
             } >> "$GITHUB_STEP_SUMMARY"
-            echo "failed: ${failed[*]}"
+            echo "failed:$failed"
             exit 1
           fi
           echo "every suite passed"

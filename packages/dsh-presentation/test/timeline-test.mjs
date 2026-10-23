@@ -9,6 +9,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { buildDeckPdf, renderDeckPages } from '../lib/build.js'
+import { inkFraction } from '../lib/png.js'
 import { validateSpec } from '../lib/tools.js'
 
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -44,11 +45,29 @@ console.log('=== the documented keys render ===')
   const rendered = await renderDeckPages({ typFile: built.typFile, buildDir: dir, outputPattern: path.join(dir, 'p-{p}.png'), ppi: 90 })
   const page = path.join(dir, 'p-2.png')
   check('the page rendered', rendered.files.length === 2, String(rendered.files.length))
-  if (fs.existsSync(page)) {
-    const withText = fs.statSync(page).size
-    // A track with no text is mostly whitespace and compresses far smaller. The
-    // broken version measured 6492 bytes at 72 ppi against 14789 with the labels.
-    check('the page carries more ink than an empty track would', withText > 9000, `${withText} bytes`)
+
+  // Compared against the same page with no items, not against a byte count: the broken
+  // version measured 6492 bytes against 14789 with labels on one font set, and a byte
+  // threshold is a property of that font set rather than of this plugin.
+  const emptyDir = path.join(WORK, 'empty')
+  fs.mkdirSync(emptyDir, { recursive: true })
+  const emptyBuilt = await buildDeckPdf({
+    spec: { title: 'TL', locale: 'zh', theme: 'metropolis', slides: [{ layout: 'cover' }, { layout: 'timeline', title: '时间线' }] },
+    buildDir: emptyDir,
+    outFile: path.join(emptyDir, 'deck.pdf'),
+  })
+  if (emptyBuilt.ok === true) {
+    await renderDeckPages({ typFile: emptyBuilt.typFile, buildDir: emptyDir, outputPattern: path.join(emptyDir, 'p-{p}.png'), ppi: 90 })
+    const emptyPage = path.join(emptyDir, 'p-2.png')
+    if (fs.existsSync(page) && fs.existsSync(emptyPage)) {
+      const withText = inkFraction(page)
+      const without = inkFraction(emptyPage)
+      check(
+        'the page carries more ink than an empty track',
+        withText.ink > without.ink,
+        `${withText.ink.toFixed(4)} vs ${without.ink.toFixed(4)}`,
+      )
+    }
   }
 }
 
