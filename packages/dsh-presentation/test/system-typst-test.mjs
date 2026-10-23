@@ -44,11 +44,19 @@ console.log('=== default still prefers the bundled binary ===')
 
 console.log('')
 console.log('=== fake Typst executables on PATH ===')
-// Windows needs a .cmd shim; a bare script would not be executable.
+// The shim has to be executable in the way this platform looks a command up: Windows
+// resolves `typst` through PATHEXT, so a `.cmd` file works there; POSIX execs a file
+// named exactly `typst` with the executable bit set. Writing only a `.cmd` made this
+// suite pass on Windows and fail on Linux and macOS, which is what CI reported.
+const FAKE_NAME = process.platform === 'win32' ? 'typst.cmd' : 'typst'
 function writeFake(name, version) {
-  const cmd = path.join(SANDBOX, `${name}.cmd`)
-  fs.writeFileSync(cmd, `@echo off\r\necho typst ${version} (fake)\r\nexit /b 0\r\n`, 'utf8')
-  return cmd
+  const file = path.join(SANDBOX, `${name}-${FAKE_NAME}`)
+  const body = process.platform === 'win32'
+    ? `@echo off\r\necho typst ${version} (fake)\r\nexit /b 0\r\n`
+    : `#!/bin/sh\necho "typst ${version} (fake)"\nexit 0\n`
+  fs.writeFileSync(file, body, 'utf8')
+  if (process.platform !== 'win32') fs.chmodSync(file, 0o755)
+  return file
 }
 const goodCmd = writeFake('good', '0.15.1')
 const oldCmd = writeFake('old', '0.14.2')
@@ -63,15 +71,18 @@ function withPath(dir, body) {
 // A directory holding only a too-old Typst: the fallback must not accept it.
 const oldDir = path.join(SANDBOX, 'old-only')
 fs.mkdirSync(oldDir, { recursive: true })
-fs.copyFileSync(oldCmd, path.join(oldDir, 'typst.cmd'))
+fs.copyFileSync(oldCmd, path.join(oldDir, FAKE_NAME))
+if (process.platform !== 'win32') fs.chmodSync(path.join(oldDir, FAKE_NAME), 0o755)
 
 const goodDir = path.join(SANDBOX, 'good')
 fs.mkdirSync(goodDir, { recursive: true })
-fs.copyFileSync(goodCmd, path.join(goodDir, 'typst.cmd'))
+fs.copyFileSync(goodCmd, path.join(goodDir, FAKE_NAME))
+if (process.platform !== 'win32') fs.chmodSync(path.join(goodDir, FAKE_NAME), 0o755)
 
 const newDir = path.join(SANDBOX, 'new')
 fs.mkdirSync(newDir, { recursive: true })
-fs.copyFileSync(newCmd, path.join(newDir, 'typst.cmd'))
+fs.copyFileSync(newCmd, path.join(newDir, FAKE_NAME))
+if (process.platform !== 'win32') fs.chmodSync(path.join(newDir, FAKE_NAME), 0o755)
 
 // `preferSystem: true` is the explicit opt-in; it must find the fake binary.
 {

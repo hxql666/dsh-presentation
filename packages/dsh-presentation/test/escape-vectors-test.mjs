@@ -10,6 +10,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { resolveBinary } from '../lib/engine.js'
 
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const WORK = path.join(PACKAGE_ROOT, '.test-output', 'escape')
@@ -75,31 +76,43 @@ function decide(deckDir, requested) {
 }
 
 console.log('=== the tool\'s arithmetic, on the shapes a model could produce ===')
+// A path shape only means what it means on the platform that parses it. `C:\Windows\Temp`
+// is a drive-letter escape on Windows and an ordinary (odd) file name on POSIX, where
+// `path.resolve` keeps it inside the deck directory — so asserting "refused" there would
+// be asserting a Windows behaviour on Linux. Each case carries the platform it applies
+// to, and the rest are recorded rather than checked.
 const CASES = [
-  ['preview', true, 'a plain name'],
-  ['sub/dir', true, 'a nested name'],
-  ['.', true, 'the deck directory itself'],
-  ['..', false, 'one level up'],
-  ['../outside', false, 'into a sibling'],
-  ['..\\outside', false, 'the same with a backslash'],
-  ['sub/../../outside', false, 'a traversal that leaves after entering'],
-  ['....//outside', false, 'a doubled dot that resolves out'],
-  ['/absolute/elsewhere', false, 'a POSIX absolute path'],
-  ['C:\\Windows\\Temp', false, 'a drive-letter path'],
-  ['C:/Windows/Temp', false, 'the same with forward slashes'],
-  ['\\\\server\\share\\dir', false, 'a UNC share'],
-  ['//server/share/dir', false, 'the same with forward slashes'],
-  ['\\Windows\\Temp', false, 'rooted but driveless — resolves to the current drive root'],
-  ['', true, 'an empty string, meaning "not given"'],
+  ['preview', true, 'a plain name', 'all'],
+  ['sub/dir', true, 'a nested name', 'all'],
+  ['.', true, 'the deck directory itself', 'all'],
+  ['..', false, 'one level up', 'all'],
+  ['../outside', false, 'into a sibling', 'all'],
+  ['sub/../../outside', false, 'a traversal that leaves after entering', 'all'],
+  ['....//outside', false, 'a doubled dot that resolves out', 'all'],
+  ['/absolute/elsewhere', false, 'a POSIX absolute path', 'all'],
+  ['..\\outside', false, 'a relative traversal with a backslash', 'win32'],
+  ['C:\\Windows\\Temp', false, 'a drive-letter path', 'win32'],
+  ['C:/Windows/Temp', false, 'the same with forward slashes', 'win32'],
+  ['\\\\server\\share\\dir', false, 'a UNC share', 'win32'],
+  ['//server/share/dir', false, 'the same with forward slashes', 'win32'],
+  ['\\Windows\\Temp', false, 'rooted but driveless — resolves to the current drive root', 'win32'],
+  ['', true, 'an empty string, meaning "not given"', 'all'],
 ]
-for (const [input, expected, why] of CASES) {
+for (const [input, expected, why, platforms] of CASES) {
+  const applies = platforms === 'all' || platforms === process.platform
+  const label = (input === '' ? '(empty)' : input).padEnd(22)
+  if (!applies) {
+    console.log(`  recorded: ${label} is a ${platforms}-shaped path; on ${process.platform} it is an ordinary name`)
+    continue
+  }
   const { contained } = decide(DECK, input)
-  check(`${(input === '' ? '(empty)' : input).padEnd(22)} -> ${contained ? 'allowed' : 'refused'}`, contained === expected, expected === contained ? why : `${why} — WRONG`)
+  check(`${label} -> ${contained ? 'allowed' : 'refused'}`, contained === expected, expected === contained ? why : `${why} — WRONG`)
 }
 
 console.log('')
 console.log('=== the same, resolved to absolute paths ===')
-for (const [input, expected] of CASES) {
+for (const [input, expected, , platforms] of CASES) {
+  if (platforms !== 'all' && platforms !== process.platform) continue
   const { resolved } = decide(DECK, input)
   const inside = resolved.toLowerCase().startsWith(DECK.toLowerCase())
   // `path.resolve` normalises, so an escape shows up as a prefix that is not the
@@ -140,15 +153,23 @@ console.log('=== a symlink that points out of the deck directory ===')
     check('a new directory is still allowed', decide(DECK, 'brand-new/dir').contained === true)
     check('the deck directory itself is still allowed', decide(DECK, '.').contained === true)
 
-    // What Typst's `--root` does in each direction, asserted because it is the
-    // reason the tool layer has to check at all: it confines reads, not writes.
-    const typst = path.join(PACKAGE_ROOT, 'node_modules', '@flukxr', 'typst-cli-win32-x64', 'vendor', 'typst.exe')
+    // What Typst's `--root` does in each direction. The tool layer has to check
+    // because on Windows `--root` confines reads but not writes — a measurement, not a
+    // rule of the format. On POSIX it may resolve the link and refuse the write too,
+    // so the write direction is asserted where it was measured and recorded elsewhere;
+    // the read direction is asserted everywhere.
+    const typst = resolveBinary().path
     const vendor = path.join(PACKAGE_ROOT, 'vendor')
     fs.writeFileSync(path.join(DECK, 'probe.typ'), '#set page(width: 4cm, height: 3cm)\nthrough a link', 'utf8')
     const viaLink = spawnSync(typst, ['compile', '--root', DECK, '--package-path', vendor, path.join(DECK, 'probe.typ'), path.join(DECK, 'linked', 'escaped.png')], { encoding: 'utf8' })
     const escaped = fs.existsSync(path.join(OUTSIDE, 'escaped.png'))
     console.log(`  write through the link: exit=${viaLink.status} landed outside=${escaped}`)
-    check('--root does not confine writes, which is why the tool checks', escaped === true)
+    if (process.platform === 'win32') {
+      check('--root does not confine writes, which is why the tool checks', escaped === true)
+    } else {
+      console.log(`  recorded on ${process.platform}: the write ${escaped ? 'escaped, as on Windows' : 'was refused by --root'}`)
+      check('the tool layer refuses the link regardless of what --root does', direct.contained === false)
+    }
 
     fs.writeFileSync(path.join(OUTSIDE, 'secret.typ'), 'outside content', 'utf8')
     const readViaLink = spawnSync(typst, ['compile', '--root', DECK, '--package-path', vendor, path.join(link, 'secret.typ'), path.join(DECK, 'read.png')], { encoding: 'utf8' })

@@ -11,6 +11,7 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { buildDeckPdf, renderDeckPages } from '../lib/build.js'
 import { inkFraction } from '../lib/png.js'
+import { resolveBinary } from '../lib/engine.js'
 
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const WORK = path.join(PACKAGE_ROOT, '.test-output', 'fonts')
@@ -90,11 +91,39 @@ check('every stack built', images.length === STACKS.length + 1, `${images.length
 const declared = STACKS.map((stack) => results.get(stack.name)?.declared)
 check('every named stack declares itself in the source', declared.every((name, index) => name === STACKS[index].name), declared.join(', '))
 
-// Distinct families are the mechanism; distinct pixels are the effect.
+// Distinct families are the mechanism; distinct pixels are the effect. The effect only
+// shows where the families exist: on a machine missing every family a stack names,
+// Typst substitutes and two stacks can legitimately render identically. So the pixels
+// are compared where the resolved families differ, and substitution is recorded
+// otherwise — asserting a difference there would test the runner's font collection,
+// not this plugin.
 const pixels = new Map(images.map((r) => [r.label, fs.readFileSync(r.file).toString('latin1')]))
+
+/**
+ * The family Typst will actually use for a stack: the first one installed.
+ * `undefined` means every named family is missing and Typst falls back to its default.
+ *
+ * The binary is resolved through the plugin so the test uses whichever Typst this
+ * platform installed. A hardcoded `@flukxr/typst-cli-win32-x64` path worked only on
+ * Windows, which is the one platform CI did not need it on.
+ */
+const installedList = (() => {
+  const binary = resolveBinary()
+  const listed = spawnSync(binary.path, ['fonts'], { encoding: 'utf8' })
+  return String(listed.stdout ?? '')
+})()
+const firstAvailable = (stack) => stack.families.find((family) => installedList.includes(family))
+
 const names = STACKS.map((s) => s.name)
 for (let i = 0; i < names.length; i += 1) {
   for (let j = i + 1; j < names.length; j += 1) {
+    const left = STACKS[i]
+    const right = STACKS[j]
+    const differs = firstAvailable(left) !== firstAvailable(right)
+    if (!differs) {
+      console.log(`  recorded: ${left.name} and ${right.name} resolve to the same family here (${firstAvailable(left) ?? 'Typst default'}), so their pages may match`)
+      continue
+    }
     check(
       `${names[i]} and ${names[j]} render differently`,
       pixels.get(names[i]) !== pixels.get(names[j]),
@@ -102,6 +131,12 @@ for (let i = 0; i < names.length; i += 1) {
     )
   }
 }
+
+// The declaration is platform-independent and must hold everywhere.
+check(
+  'every stack declares its own family list',
+  new Set(STACKS.map((stack) => stack.families.join('|'))).size === STACKS.length,
+)
 
 // An unspecified stack must resolve to the template's default, not to a fourth
 // stack of its own.
@@ -118,9 +153,9 @@ console.log('=== is a named family actually installed? ===')
   // warning, so a deck can render in a different face than the spec asked for and
   // nothing says so. This records which families are present, because "the font
   // stack works" and "the font you asked for was used" are different claims.
-  const typst = path.join(PACKAGE_ROOT, 'node_modules', '@flukxr', 'typst-cli-win32-x64', 'vendor', 'typst.exe')
-  const listed = spawnSync(typst, ['fonts'], { encoding: 'utf8' })
-  const installed = String(listed.stdout ?? '')
+  // Recorded rather than asserted: which fonts a machine has is not this project's
+  // to control, and CI runners differ from a desktop.
+  const installed = installedList
   let missing = 0
   for (const stack of STACKS) {
     const present = stack.families.filter((family) => installed.includes(family))
@@ -130,7 +165,7 @@ console.log('=== is a named family actually installed? ===')
     if (absent.length > 0) console.log(`  ${''.padEnd(10)} absent:  ${absent.join(', ')}`)
   }
   console.log('')
-  console.log(`  ${missing} of ${STACKS.length} stacks name a family that is not installed.`)
+  console.log(`  ${missing} of ${STACKS.length} stacks name a family that is not installed on this machine.`)
   console.log('  Typst substitutes silently, so a deck can render in a different face than')
   console.log('  requested; the fallback order in each stack is what keeps that acceptable.')
 }

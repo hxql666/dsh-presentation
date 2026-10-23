@@ -56,8 +56,41 @@ jobs:
           }
           "
 
-      - name: Test
-        run: npm test
+      - name: Type check
+        run: npx tsc -p tsconfig.json
+
+      # One step per suite, so a failure is attributable. `npm test` chains them with
+      # `&&`, which reports only "the chain failed" — on the first CI run that meant two
+      # platforms were red with no way to tell which suite or why. Each failure also
+      # becomes an annotation, which stays readable through the checks API without
+      # downloading job logs.
+      - name: Test each suite
+        shell: bash
+        run: |
+          cd packages/dsh-presentation
+          mapfile -t suites < <(node -e "const j=require('./package.json');console.log(j.scripts.test.split(' && ').map(s=>s.replace(/^node test\//,'').replace(/\.mjs$/,'')).join('\n'))")
+          echo "${#suites[@]} suites declared in package.json"
+          failed=()
+          for suite in "${suites[@]}"; do
+            if node "test/$suite.mjs" > "$RUNNER_TEMP/$suite.log" 2>&1; then
+              echo "ok    $suite"
+            else
+              echo "FAIL  $suite"
+              echo "::error title=suite:$suite (${{ matrix.os }})::test/$suite.mjs failed"
+              echo "--- tail of $suite ---"
+              tail -n 30 "$RUNNER_TEMP/$suite.log"
+              failed+=("$suite")
+            fi
+          done
+          if [ ${#failed[@]} -gt 0 ]; then
+            {
+              echo "### Failed suites on ${{ matrix.os }}"
+              for suite in "${failed[@]}"; do echo "- \`$suite\`"; done
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "failed: ${failed[*]}"
+            exit 1
+          fi
+          echo "every suite passed"
 
   # The published artifact is what a stranger installs, so it gets its own check:
   # the tarball must contain the vendored Typst package and nothing that should not

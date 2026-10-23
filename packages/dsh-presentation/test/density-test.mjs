@@ -77,6 +77,7 @@ console.log('=== the decoder matches the PNG header ===')
 
 console.log('')
 console.log('=== a normal page is not flagged ===')
+let normalInk
 {
   const built = await build.execute(
     { spec: { title: 'normal', locale: 'zh', slides: [{ layout: 'cover' }, { layout: 'bullets', title: '正常', items: [item('甲'), item('乙'), item('丙')] }] } },
@@ -85,12 +86,16 @@ console.log('=== a normal page is not flagged ===')
   ok('it builds', built.ok === true, String(built.message ?? built.stderr ?? '').slice(0, 80))
   const result = await check.execute({}, exec)
   const densest = Math.max(...result.density.map((d) => d.ink))
-  ok('no page is reported as too dense', result.tooDense === undefined, `densest ${densest}`)
-  ok('the densest page stays under the threshold', densest < 0.19, String(densest))
+  normalInk = densest
+  ok('no page is reported as too dense', result.tooDense === undefined, `densest ${densest.toFixed(4)}`)
+  // The absolute number depends on the fonts a machine has, so it is reported rather
+  // than asserted; what must hold everywhere is that a normal page is not flagged.
+  console.log(`      densest normal page: ${densest.toFixed(4)} of the page is ink`)
 }
 
 console.log('')
 console.log('=== an overfull page is flagged ===')
+let packedInk
 {
   const built = await build.execute(
     {
@@ -106,8 +111,15 @@ console.log('=== an overfull page is flagged ===')
   const flagged = result.tooDense ?? []
   ok('the packed page is reported', flagged.length > 0, flagged.join(' | ').slice(0, 90))
   ok('the report names it as overfull', flagged.some((line) => line.includes('page-2')))
-  const worst = Math.max(...result.density.map((d) => d.ink))
-  ok('its density is above the threshold', worst >= 0.19, String(worst))
+  packedInk = Math.max(...result.density.map((d) => d.ink))
+  // Relative rather than absolute: the threshold is calibrated for one font set, and a
+  // runner with different fonts shifts every page's density together. What must hold is
+  // that a page packed with text is clearly denser than a comfortable one.
+  ok(
+    'the packed page is clearly denser than the normal one',
+    packedInk > normalInk * 1.5,
+    `${packedInk.toFixed(4)} vs ${normalInk.toFixed(4)}`,
+  )
 }
 
 console.log('')
@@ -194,7 +206,9 @@ console.log('=== a picture page is exempt, because its ink is the picture ===')
 
   const result = await check.execute({ ppi: 72 }, exec)
   const page = (result.density ?? []).find((entry) => entry.page === 'page-2.png')
-  ok('its density is above the threshold', (page?.ink ?? 0) >= 0.19, String(page?.ink))
+  // A gradient fills most of the page, so the absolute fraction is high on any font
+  // set; asserted loosely here and exactly by the behavioural checks below.
+  ok('the picture page carries a lot of ink', (page?.ink ?? 0) >= 0.19, String(page?.ink))
   ok('it is recognised as a picture', page?.picture === true, JSON.stringify(page))
   ok('it is not reported as too dense', (result.tooDense ?? []).length === 0, JSON.stringify(result.tooDense ?? null))
   ok('no warning reaches the model', !renderedText(check, result).includes('WARNING'))

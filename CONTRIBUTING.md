@@ -10,7 +10,7 @@ git clone https://github.com/hxql666/dsh-presentation
 cd dsh-presentation
 npm install            # fetches the Typst binary for your platform
 cd packages/dsh-presentation
-npm test               # 22 suites
+npm test               # 27 suites, all platforms
 ```
 
 `npm install` at the root installs the toolchain (TypeScript, Node types); the
@@ -49,6 +49,23 @@ suite.
 **5. Run `npm test` before you push.** It runs the type check, then all suites. A
 type error fails the run; the type check is `tsc --checkJs` over the source and its
 JSDoc, which is how a documented contract is kept from drifting from the code.
+
+**6. A test must not assert one platform's behaviour on another.** CI runs Ubuntu,
+Windows and macOS, and the suite has to be green on all three. Three ways this goes
+wrong, all of which have happened here:
+
+- **A hardcoded binary path.** `node_modules/@flukxr/typst-cli-win32-x64/vendor/typst.exe`
+  works on exactly one platform; use `resolveBinary()` from `lib/engine.ts` instead.
+- **A fake executable.** A `.cmd` shim is found through `PATHEXT` on Windows and not at
+  all on POSIX, where a command needs an executable bit — write a `#!/bin/sh` script and
+  `chmod 0o755` there.
+- **A path shape or font that only exists on one platform.** `C:\Windows\Temp` is a
+  drive-letter escape on Windows and an ordinary file name on POSIX; and a machine
+  without the named font families substitutes them, so two font stacks can legitimately
+  render identically. Guard the platform-specific assertion and record the rest.
+
+Anything measured on one machine — a density threshold, a pixel diff, a font list —
+belongs in the test as a recorded value, not as a rule another platform must satisfy.
 
 ## Adding a page type
 
