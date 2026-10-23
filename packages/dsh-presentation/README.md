@@ -1,5 +1,11 @@
 # @hxql/dsh-presentation
 
+> **本项目已停止维护（2026-10-24）。** 不再接受 issue 与 pull request，不再发布新版本；
+> 已经发布到 npm 的版本仍可安装，但不会再收到修复。仓库保留为历史存档。
+>
+> **No longer maintained as of 2026-10-24.** Published npm versions remain installable;
+> they will not receive fixes.
+
 演示文档模式（Presentation-Document Mode）—— 一个 DSH 协作模式插件：以结构化数据驱动
 Typst + Touying 生成 PDF 演示文稿，并带**视觉自审闭环**。
 

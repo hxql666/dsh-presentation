@@ -4,6 +4,15 @@
 [![npm](https://img.shields.io/npm/v/@hxql/dsh-presentation?label=npm)](https://www.npmjs.com/package/@hxql/dsh-presentation)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
+> **本项目已停止维护（2026-10-24）。**
+>
+> 不再接受 issue、pull request，也不再发布新版本。仓库保留为历史存档，代码与文档按原样提供，
+> 不会再更新。已经发布到 npm 的版本仍可安装使用，但不会再收到修复。
+>
+> **The project is no longer maintained as of 2026-10-24.** Issues and pull requests are
+> closed, no further versions will be published, and the repository stays up as an archive.
+> Published npm versions remain installable; they will not receive fixes.
+
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）的**演示文档模式**：
 演示文稿以**结构化页面数据**书写，用 [Typst](https://typst.app) + [Touying](https://github.com/touying-typ/touying)
 编译成 PDF，并把页面**渲染回图片，让 agent 亲眼看自己的产出**之后再交付。

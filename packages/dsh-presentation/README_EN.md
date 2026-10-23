@@ -4,6 +4,12 @@
 [![npm](https://img.shields.io/npm/v/@hxql/dsh-presentation?label=npm)](https://www.npmjs.com/package/@hxql/dsh-presentation)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
+> **The project is no longer maintained as of 2026-10-24.** Issues and pull requests are
+> closed, no further versions will be published, and the repository stays up as an
+> archive. Published npm versions remain installable; they will not receive fixes.
+>
+> **本项目已停止维护（2026-10-24）。** 不再接受 issue、pull request，也不再发布新版本。
+
 A presentation-document mode for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH):
 decks are authored as **structured page data**, compiled to PDF with
 [Typst](https://typst.app) + [Touying](https://github.com/touying-typ/touying),
