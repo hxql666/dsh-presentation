@@ -49,7 +49,7 @@ Windows 通过，Ubuntu 与 macOS 在测试步骤失败。`npm test` 用 `&&` �
 
 ### 清理
 
-- 删掉 `test/` 下 11 个一次性调查脚本（从未进套件、多个硬编码 `E:\dsh_work\...`、
+- 删掉 `test/` 下 11 个一次性调查脚本（从未进套件、多个硬编码了本机绝对路径、
   文档无引用）。现在 `test/` 里是套件 + 两个有文档引用的生成器（`readme-demo`、`perf-measure`）
   + 两个标定工具（`colour-calibrate`、`density-calibrate`）。
 
