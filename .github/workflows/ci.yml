@@ -35,6 +35,20 @@ jobs:
         with:
           node-version: '22'
 
+      # A deck is usually written in Chinese, Japanese or Korean, and Typst's bundled
+      # fonts (New Computer Modern, Libertinus) have no CJK coverage. A bare Linux
+      # runner therefore renders CJK text as nothing, which makes two pages that differ
+      # only in Chinese text come out identical — the failure showed up as
+      # `determinism-test` seeing an edited page unchanged and `visual-title-test`
+      # seeing a titled page match an untitled one. macOS and Windows ship CJK fonts,
+      # which is why only Ubuntu failed.
+      #
+      # The package does not bundle fonts (see the README), so a runner needs one the
+      # same way a user does.
+      - name: Install a CJK font (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-cjk
+
       # Root install brings the toolchain (TypeScript, Node types). The package's
       # own install fetches the Typst binary for this platform — an optional
       # dependency, so a platform without a published binary would silently skip it

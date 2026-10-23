@@ -17,6 +17,12 @@ npm test               # 27 suites, all platforms
 package's own `npm install` pulls the platform Typst binary as an optional
 dependency. A test run needs that binary, or a system Typst 0.15.x it can find.
 
+It also needs a **CJK font**. The package bundles no fonts, and Typst's own
+(New Computer Modern, Libertinus) have no Chinese, Japanese or Korean coverage, so on a
+bare Linux machine CJK text renders as nothing — which makes two pages that differ only
+in Chinese text come out identical. CI installs `fonts-noto-cjk` on Linux for exactly
+this reason; macOS and Windows already ship one.
+
 ## The rules that matter
 
 **1. Every behaviour change comes with a test that would fail without it.**
