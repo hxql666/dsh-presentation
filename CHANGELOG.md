@@ -5,6 +5,46 @@
 
 ---
 
+## 0.5.4
+
+### 修复（**CI 从加入起就一直红**）
+
+Windows 通过，Ubuntu 与 macOS 在测试步骤失败。`npm test` 用 `&&` 串联套件，日志只说明
+"链条失败"，而 job 日志需要认证才能下载 —— 所以**第一个修的是 CI 本身**。
+
+三处断言是在 Windows 上写完就当成通用规则：
+
+- **硬编码的编译器路径**。`escape-vectors-test` 与 `font-stack-test` 把 Typst 路径写成
+  `node_modules/@flukxr/typst-cli-win32-x64/vendor/typst.exe`，三个 runner 里只有一个存在。
+  两者改为通过 `resolveBinary()` 解析 —— 和插件自己用的是同一个函数。
+- **`.cmd` 假可执行文件**。`system-typst-test` 把假 `typst` 写成 Windows `.cmd` shim。
+  Windows 靠 `PATHEXT` 能找到；POSIX 只执行名字恰好为 `typst` 且带可执行位的文件，
+  于是假文件等于不存在，所有 fallback 断言失败。现在 POSIX 下写 `#!/bin/sh` 脚本并 `chmod 0755`。
+- **Windows 形状的路径与 Windows 才有的字体**。`escape-vectors-test` 断言
+  `C:\Windows\Temp`、UNC 共享会被拒绝 —— 在 Windows 成立（它们是逃逸），在 POSIX 不成立
+  （它们只是 deck 目录里的普通文件名）。每条用例现在标注适用平台，其余记录。
+  `font-stack-test` 断言三个字体栈渲染必然不同；**没有那些字族的机器上 Typst 会替换字体，
+  两个栈可以合法地渲染成一样**，所以像素比对只在解析出的字族真的不同时才做。
+
+只属于一台机器的测量值（密度阈值、像素差）改为**记录**而不是当作别的平台必须满足的规则。
+`density-test` 改为比较"塞爆页 vs 正常页"这个真正要成立的性质，而不是拿本机字体标定出的数字。
+
+### CI
+
+- `ci.yml` 改成**每个套件一个步骤**，失败时发 `::error` 注解写明套件名与平台，并写进
+  job summary。下一次失败可以直接从 checks API 读出是哪个套件，不用下载日志。
+
+### 清理
+
+- 删掉 `test/` 下 11 个一次性调查脚本（从未进套件、多个硬编码 `E:\dsh_work\...`、
+  文档无引用）。现在 `test/` 里是套件 + 两个有文档引用的生成器（`readme-demo`、`perf-measure`）
+  + 两个标定工具（`colour-calibrate`、`density-calibrate`）。
+
+- `CONTRIBUTING.md` 加了这一轮换来的规则：**测试不得把某一个平台的行为当成通用断言**，
+  并列出三种具体踩法。
+
+---
+
 ## 0.5.3
 
 ### 修复（**升级 DSH 后演示模式完全不可用**）
