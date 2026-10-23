@@ -67,9 +67,15 @@ jobs:
       - name: Test each suite
         shell: bash
         run: |
+          # Deliberately not `-e -o pipefail`, which is what `shell: bash` turns on by
+          # default: a pipeline like `grep … | head` exits 1 when grep matches nothing,
+          # and with pipefail that aborts the whole step — which is how the first version
+          # of this loop failed on Ubuntu with no annotation emitted at all. Errors are
+          # handled explicitly below instead.
+          set +e
+          set +o pipefail
           cd packages/dsh-presentation
-          # No `mapfile`: macOS ships bash 3.2, where it does not exist, and the job
-          # died with exit 127 before running a single suite.
+          # No `mapfile` either: macOS ships bash 3.2, where it does not exist.
           suites=$(node -e "const j=require('./package.json');console.log(j.scripts.test.split(' && ').map(s=>s.replace(/^node test\//,'').replace(/\.mjs$/,'')).join(' '))")
           count=$(echo "$suites" | wc -w | tr -d ' ')
           echo "$count suites declared in package.json"
@@ -80,10 +86,10 @@ jobs:
             else
               echo "FAIL  $suite"
               # The reason goes into the annotation, so a failure is diagnosable from
-              # the checks API alone. `%` and newlines are escaped because they are
-              # syntax in a workflow command.
-              detail=$(grep -E '^  FAIL|Error|error:' "$RUNNER_TEMP/$suite.log" | head -n 5 | tr '\n' '|' | sed 's/%/%25/g')
-              echo "::error title=suite:$suite (${{ matrix.os }})::${detail:-test/$suite.mjs failed (no FAIL line found)}"
+              # the checks API alone. `%` is escaped because it is syntax in a workflow
+              # command; a missing match must not abort the step.
+              detail=$( (grep -E '^  FAIL|Error|error:' "$RUNNER_TEMP/$suite.log" || true) | head -n 5 | tr '\n' '|' | sed 's/%/%25/g')
+              echo "::error title=suite:$suite (${{ matrix.os }})::${detail:-test/$suite.mjs failed; see the step log}"
               echo "--- tail of $suite ---"
               tail -n 30 "$RUNNER_TEMP/$suite.log"
               failed="$failed $suite"
